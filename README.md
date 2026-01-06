@@ -4,6 +4,14 @@ A full-stack personal library management system with AI integration via Model Co
 
 **Track your books, manage your reading list, and query your library using Claude or Gemini.**
 
+## 🚀 Quick Links
+
+- **[Quick Start Guide](QUICKSTART.md)** - Get running in under 2 minutes with Docker
+- **[Docker Guide](DOCKER.md)** - Complete Docker documentation and troubleshooting
+- **[API Documentation](backend/README.md)** - REST API reference
+- **[MCP Setup](mcp-server/README.md)** - AI integration guide
+- **[Database Schema](database/README.md)** - Database structure and queries
+
 ## Features
 
 - **Book Catalog**: Organize your personal library with detailed book information (title, author, ISBN, publisher, etc.)
@@ -35,7 +43,86 @@ panicless-library/
 
 ## Quick Start
 
-### Prerequisites
+### Option 1: Docker (Recommended - Fastest)
+
+The easiest way to run Panicless Library is using Docker Compose, which starts all services with a single command.
+
+#### Prerequisites
+
+- **Docker** and **Docker Compose** ([Install Docker](https://docs.docker.com/get-docker/))
+- **Git**
+
+#### Steps
+
+1. **Clone the repository**:
+```bash
+git clone <repository-url>
+cd panicless-library
+```
+
+2. **Configure environment** (optional):
+```bash
+cp .env.example .env
+# Edit .env and set a secure JWT_SECRET
+# Or use the default for development
+```
+
+3. **Start all services**:
+```bash
+docker-compose up -d
+# Or use the Makefile:
+make up
+```
+
+This will start:
+- PostgreSQL on port 5432
+- Backend API on port 8080
+- Frontend on port 3000
+
+4. **Wait for services to be ready** (about 30-60 seconds for first build):
+```bash
+docker-compose ps
+# All services should show "Up" and "healthy"
+```
+
+5. **Access the application**:
+
+Open your browser at: **http://localhost:3000**
+
+- Register a new account or use seed data (if migrations ran automatically)
+- The database migrations run automatically on first start!
+
+6. **View logs** (optional):
+```bash
+docker-compose logs -f
+# Or: make logs
+```
+
+7. **Stop services**:
+```bash
+docker-compose down
+# Or: make down
+```
+
+#### Useful Make Commands
+
+```bash
+make help           # Show all available commands
+make build          # Build Docker images
+make up             # Start all services
+make down           # Stop all services
+make logs           # Show logs
+make logs-backend   # Show backend logs only
+make restart        # Restart all services
+make clean          # Remove all containers and volumes
+make shell-postgres # Open PostgreSQL shell
+```
+
+### Option 2: Manual Setup (Development)
+
+For active development, you may want to run services individually.
+
+#### Prerequisites
 
 - **Rust** 1.75+ ([Install Rust](https://rustup.rs/))
 - **Node.js** 18+ and npm ([Install Node](https://nodejs.org/))
@@ -271,7 +358,113 @@ curl -X POST http://localhost:8080/api/auth/login \
 
 ## Production Deployment
 
-### Environment Variables
+### Option 1: Docker Deployment (Recommended)
+
+The easiest way to deploy Panicless Library is using Docker Compose.
+
+#### Prerequisites
+- Docker and Docker Compose on production server
+- Domain name (optional, but recommended)
+- SSL certificate (Let's Encrypt recommended)
+
+#### Steps
+
+1. **Clone repository on server**:
+```bash
+git clone <repository-url>
+cd panicless-library
+```
+
+2. **Configure production environment**:
+```bash
+cp .env.example .env
+nano .env
+```
+
+Edit `.env`:
+```bash
+# Generate a secure JWT secret:
+# openssl rand -base64 64
+JWT_SECRET=<YOUR-SECURE-64-CHAR-RANDOM-STRING>
+
+POSTGRES_USER=panicless
+POSTGRES_PASSWORD=<SECURE-PASSWORD>
+POSTGRES_DB=panicless_library
+
+VITE_API_BASE_URL=https://api.yourdomain.com
+```
+
+3. **Update docker-compose.yml for production**:
+
+Update `CORS_ALLOWED_ORIGINS` in the backend service:
+```yaml
+CORS_ALLOWED_ORIGINS: https://yourdomain.com
+```
+
+Update frontend `VITE_API_BASE_URL`:
+```yaml
+args:
+  VITE_API_BASE_URL: https://api.yourdomain.com
+```
+
+4. **Build and start services**:
+```bash
+docker-compose up -d --build
+```
+
+5. **Set up reverse proxy (nginx)**:
+
+Create `/etc/nginx/sites-available/panicless`:
+```nginx
+# Frontend
+server {
+    listen 80;
+    server_name yourdomain.com;
+
+    location / {
+        proxy_pass http://localhost:3000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}
+
+# Backend API
+server {
+    listen 80;
+    server_name api.yourdomain.com;
+
+    location / {
+        proxy_pass http://localhost:8080;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}
+```
+
+6. **Enable SSL with Let's Encrypt**:
+```bash
+sudo certbot --nginx -d yourdomain.com -d api.yourdomain.com
+```
+
+7. **Set up automatic backups**:
+```bash
+# Create backup script
+cat > backup.sh << 'EOF'
+#!/bin/bash
+docker-compose exec -T postgres pg_dump -U panicless panicless_library | gzip > backup-$(date +%Y%m%d-%H%M%S).sql.gz
+EOF
+
+chmod +x backup.sh
+
+# Add to crontab (daily at 2 AM)
+echo "0 2 * * * /path/to/panicless-library/backup.sh" | crontab -
+```
+
+### Option 2: Manual Production Build
+
+For custom deployments without Docker.
+
+#### Environment Variables
 
 **Backend** (`backend/.env`):
 ```bash
@@ -286,7 +479,7 @@ ENVIRONMENT=production
 VITE_API_BASE_URL=https://api.yourdomain.com
 ```
 
-### Build for Production
+#### Build for Production
 
 **Backend**:
 ```bash
@@ -323,15 +516,65 @@ Contributions are welcome! Please:
 
 ## Troubleshooting
 
-### Backend won't start
+### Docker Issues
 
+**Services won't start**:
+```bash
+# Check service status
+docker-compose ps
+
+# View logs
+docker-compose logs -f
+
+# Restart all services
+docker-compose restart
+
+# Rebuild from scratch
+docker-compose down -v
+docker-compose up -d --build
+```
+
+**Backend shows "unhealthy"**:
+```bash
+# Check backend logs
+docker-compose logs backend
+
+# Common issues:
+# - Database not ready yet (wait 30-60s)
+# - JWT_SECRET not set
+# - Database connection error
+```
+
+**Frontend shows blank page**:
+```bash
+# Check if backend is healthy
+docker-compose ps backend
+
+# Check frontend logs
+docker-compose logs frontend
+
+# Verify API URL is correct
+docker-compose exec frontend cat /usr/share/nginx/html/index.html | grep VITE_API_BASE_URL
+```
+
+**Port already in use**:
+```bash
+# Find process using port
+sudo lsof -i :8080  # or :3000, :5432
+
+# Change port in docker-compose.yml
+# For example: "8081:8080" instead of "8080:8080"
+```
+
+### Manual Setup Issues
+
+**Backend won't start**:
 - Check PostgreSQL is running: `docker-compose ps`
 - Verify DATABASE_URL in `backend/.env`
 - Ensure migrations are run
 - Check JWT_SECRET is set
 
-### Frontend can't connect to API
-
+**Frontend can't connect to API**:
 - Verify backend is running on port 8080
 - Check CORS settings in backend
 - Check `VITE_API_BASE_URL` in `frontend/.env`
