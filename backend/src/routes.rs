@@ -1,0 +1,66 @@
+use axum::{
+    middleware,
+    routing::{delete, get, patch, post, put},
+    Router,
+};
+use tower_http::cors::CorsLayer;
+
+use crate::{
+    config::Config,
+    db::DbPool,
+    handlers,
+    middleware::auth::auth_middleware,
+};
+
+pub fn create_router(pool: DbPool, config: Config) -> Router {
+    // Configure CORS
+    let cors = CorsLayer::permissive(); // TODO: Restrict in production using config.cors_allowed_origins
+
+    // Public routes (no authentication required)
+    let public_routes = Router::new()
+        .route("/api/auth/register", post(handlers::register))
+        .route("/api/auth/login", post(handlers::login))
+        .route("/api/auth/refresh", post(handlers::refresh));
+
+    // Protected routes (authentication required)
+    let protected_routes = Router::new()
+        // Auth
+        .route("/api/auth/me", get(handlers::get_current_user))
+        // Users
+        .route("/api/users/:id", get(handlers::get_user))
+        .route("/api/users/:id", put(handlers::update_user))
+        .route("/api/users/:id", delete(handlers::delete_user))
+        // Books
+        .route("/api/books", get(handlers::list_books))
+        .route("/api/books", post(handlers::create_book))
+        .route("/api/books/:id", get(handlers::get_book))
+        .route("/api/books/:id", put(handlers::update_book))
+        .route("/api/books/:id", delete(handlers::delete_book))
+        .route("/api/books/:id/readings", get(handlers::get_book_readings))
+        // Readings
+        .route("/api/readings", get(handlers::list_readings))
+        .route("/api/readings", post(handlers::create_reading))
+        .route("/api/readings/:id", get(handlers::get_reading))
+        .route("/api/readings/:id", put(handlers::update_reading))
+        .route("/api/readings/:id", delete(handlers::delete_reading))
+        .route("/api/readings/:id/complete", patch(handlers::complete_reading))
+        .route("/api/readings/stats", get(handlers::get_reading_stats))
+        // Apply authentication middleware to all protected routes
+        .layer(middleware::from_fn_with_state(
+            config.clone(),
+            auth_middleware,
+        ));
+
+    // Health check endpoint (no auth required)
+    let health_routes = Router::new()
+        .route("/health", get(|| async { "OK" }));
+
+    // Combine all routes
+    Router::new()
+        .merge(public_routes)
+        .merge(protected_routes)
+        .merge(health_routes)
+        .layer(cors)
+        .with_state(pool)
+        .with_state(config)
+}
