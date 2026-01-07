@@ -1,5 +1,5 @@
 use axum::{
-    extract::{Path, Request, State},
+    extract::{Path, State},
     Json,
 };
 use validator::Validate;
@@ -14,13 +14,8 @@ use crate::{
 pub async fn get_user(
     State(pool): State<DbPool>,
     Path(user_id): Path<i32>,
-    request: Request,
+    claims: Claims,
 ) -> AppResult<Json<UserResponse>> {
-    let claims = request
-        .extensions()
-        .get::<Claims>()
-        .ok_or_else(|| AppError::Authentication("No claims found".to_string()))?;
-
     // Users can only access their own profile
     if claims.sub != user_id {
         return Err(AppError::Authorization("Access denied".to_string()));
@@ -40,14 +35,9 @@ pub async fn get_user(
 pub async fn update_user(
     State(pool): State<DbPool>,
     Path(user_id): Path<i32>,
-    request: Request,
+    claims: Claims,
     Json(payload): Json<UpdateUser>,
 ) -> AppResult<Json<UserResponse>> {
-    let claims = request
-        .extensions()
-        .get::<Claims>()
-        .ok_or_else(|| AppError::Authentication("No claims found".to_string()))?;
-
     if claims.sub != user_id {
         return Err(AppError::Authorization("Access denied".to_string()));
     }
@@ -92,13 +82,8 @@ pub async fn update_user(
 pub async fn delete_user(
     State(pool): State<DbPool>,
     Path(user_id): Path<i32>,
-    request: Request,
+    claims: Claims,
 ) -> AppResult<Json<serde_json::Value>> {
-    let claims = request
-        .extensions()
-        .get::<Claims>()
-        .ok_or_else(|| AppError::Authentication("No claims found".to_string()))?;
-
     if claims.sub != user_id {
         return Err(AppError::Authorization("Access denied".to_string()));
     }

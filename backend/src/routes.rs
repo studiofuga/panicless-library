@@ -1,4 +1,5 @@
 use axum::{
+    extract::FromRef,
     middleware,
     routing::{delete, get, patch, post, put},
     Router,
@@ -12,7 +13,30 @@ use crate::{
     middleware::auth::auth_middleware,
 };
 
+#[derive(Clone)]
+pub struct AppState {
+    pub pool: DbPool,
+    pub config: Config,
+}
+
+impl FromRef<AppState> for DbPool {
+    fn from_ref(state: &AppState) -> Self {
+        state.pool.clone()
+    }
+}
+
+impl FromRef<AppState> for Config {
+    fn from_ref(state: &AppState) -> Self {
+        state.config.clone()
+    }
+}
+
 pub fn create_router(pool: DbPool, config: Config) -> Router {
+    let state = AppState {
+        pool,
+        config: config.clone(),
+    };
+
     // Configure CORS
     let cors = CorsLayer::permissive(); // TODO: Restrict in production using config.cors_allowed_origins
 
@@ -61,6 +85,5 @@ pub fn create_router(pool: DbPool, config: Config) -> Router {
         .merge(protected_routes)
         .merge(health_routes)
         .layer(cors)
-        .with_state(pool)
-        .with_state(config)
+        .with_state(state)
 }

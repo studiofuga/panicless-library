@@ -3,7 +3,7 @@ use argon2::{
     Argon2,
 };
 use axum::{
-    extract::{Request, State},
+    extract::State,
     Json,
 };
 use validator::Validate;
@@ -12,9 +12,10 @@ use crate::{
     config::Config,
     db::DbPool,
     errors::{AppError, AppResult},
-    middleware::{Claims, generate_jwt},
+    middleware::Claims,
     models::user::{AuthResponse, CreateUser, LoginRequest, User, UserResponse},
 };
+use crate::middleware::auth::generate_jwt;
 
 pub async fn register(
     State(pool): State<DbPool>,
@@ -190,13 +191,8 @@ pub async fn refresh(
 
 pub async fn get_current_user(
     State(pool): State<DbPool>,
-    request: Request,
+    claims: Claims,
 ) -> AppResult<Json<UserResponse>> {
-    let claims = request
-        .extensions()
-        .get::<Claims>()
-        .ok_or_else(|| AppError::Authentication("No claims found".to_string()))?;
-
     let user = sqlx::query_as::<_, User>(
         "SELECT * FROM users WHERE id = $1"
     )

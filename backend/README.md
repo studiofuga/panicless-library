@@ -26,7 +26,7 @@ REST API server for Panicless Library, built with Rust, Axum, and PostgreSQL.
 
 ### Prerequisites
 
-- Rust 1.75+ (2021 edition)
+- Rust 1.85+ (edition 2021, supports edition 2024 dependencies)
 - PostgreSQL 16+ (or use Docker Compose)
 - Environment variables configured (see `.env.example`)
 

@@ -1,5 +1,5 @@
 use axum::{
-    extract::{Path, Query, Request, State},
+    extract::{Path, Query, State},
     Json,
 };
 use validator::Validate;
@@ -15,12 +15,8 @@ use crate::{
 pub async fn list_books(
     State(pool): State<DbPool>,
     Query(query): Query<BookQuery>,
-    request: Request,
+    claims: Claims,
 ) -> AppResult<Json<Vec<Book>>> {
-    let claims = request
-        .extensions()
-        .get::<Claims>()
-        .ok_or_else(|| AppError::Authentication("No claims found".to_string()))?;
 
     let page = query.page.unwrap_or(1);
     let limit = query.limit.unwrap_or(20);
@@ -53,12 +49,12 @@ pub async fn list_books(
 
     if let Some(search) = query.search {
         let search_pattern = format!("%{}%", search);
-        query_builder = query_builder.bind(&search_pattern);
+        query_builder = query_builder.bind(search_pattern);
     }
 
     if let Some(author) = query.author {
         let author_pattern = format!("%{}%", author);
-        query_builder = query_builder.bind(&author_pattern);
+        query_builder = query_builder.bind(author_pattern);
     }
 
     if let Some(year) = query.year {
@@ -75,12 +71,8 @@ pub async fn list_books(
 pub async fn get_book(
     State(pool): State<DbPool>,
     Path(book_id): Path<i32>,
-    request: Request,
+    claims: Claims,
 ) -> AppResult<Json<Book>> {
-    let claims = request
-        .extensions()
-        .get::<Claims>()
-        .ok_or_else(|| AppError::Authentication("No claims found".to_string()))?;
 
     let book = sqlx::query_as::<_, Book>(
         "SELECT * FROM books WHERE id = $1 AND user_id = $2"
@@ -96,13 +88,9 @@ pub async fn get_book(
 
 pub async fn create_book(
     State(pool): State<DbPool>,
-    request: Request,
+    claims: Claims,
     Json(payload): Json<CreateBook>,
 ) -> AppResult<Json<Book>> {
-    let claims = request
-        .extensions()
-        .get::<Claims>()
-        .ok_or_else(|| AppError::Authentication("No claims found".to_string()))?;
 
     payload.validate()
         .map_err(|e| AppError::Validation(e.to_string()))?;
@@ -132,13 +120,9 @@ pub async fn create_book(
 pub async fn update_book(
     State(pool): State<DbPool>,
     Path(book_id): Path<i32>,
-    request: Request,
+    claims: Claims,
     Json(payload): Json<UpdateBook>,
 ) -> AppResult<Json<Book>> {
-    let claims = request
-        .extensions()
-        .get::<Claims>()
-        .ok_or_else(|| AppError::Authentication("No claims found".to_string()))?;
 
     payload.validate()
         .map_err(|e| AppError::Validation(e.to_string()))?;
@@ -252,12 +236,8 @@ pub async fn update_book(
 pub async fn delete_book(
     State(pool): State<DbPool>,
     Path(book_id): Path<i32>,
-    request: Request,
+    claims: Claims,
 ) -> AppResult<Json<serde_json::Value>> {
-    let claims = request
-        .extensions()
-        .get::<Claims>()
-        .ok_or_else(|| AppError::Authentication("No claims found".to_string()))?;
 
     let result = sqlx::query(
         "DELETE FROM books WHERE id = $1 AND user_id = $2"
@@ -279,12 +259,8 @@ pub async fn delete_book(
 pub async fn get_book_readings(
     State(pool): State<DbPool>,
     Path(book_id): Path<i32>,
-    request: Request,
+    claims: Claims,
 ) -> AppResult<Json<Vec<Reading>>> {
-    let claims = request
-        .extensions()
-        .get::<Claims>()
-        .ok_or_else(|| AppError::Authentication("No claims found".to_string()))?;
 
     // Verify book belongs to user
     let _ = sqlx::query_as::<_, Book>(

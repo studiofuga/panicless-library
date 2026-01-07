@@ -1,5 +1,5 @@
 use axum::{
-    extract::{Path, Query, Request, State},
+    extract::{Path, Query, State},
     Json,
 };
 use validator::Validate;
@@ -17,12 +17,8 @@ use crate::{
 pub async fn list_readings(
     State(pool): State<DbPool>,
     Query(query): Query<ReadingQuery>,
-    request: Request,
+    claims: Claims,
 ) -> AppResult<Json<Vec<ReadingWithBook>>> {
-    let claims = request
-        .extensions()
-        .get::<Claims>()
-        .ok_or_else(|| AppError::Authentication("No claims found".to_string()))?;
 
     let page = query.page.unwrap_or(1);
     let limit = query.limit.unwrap_or(20);
@@ -84,12 +80,8 @@ pub async fn list_readings(
 pub async fn get_reading(
     State(pool): State<DbPool>,
     Path(reading_id): Path<i32>,
-    request: Request,
+    claims: Claims,
 ) -> AppResult<Json<Reading>> {
-    let claims = request
-        .extensions()
-        .get::<Claims>()
-        .ok_or_else(|| AppError::Authentication("No claims found".to_string()))?;
 
     let reading = sqlx::query_as::<_, Reading>(
         "SELECT * FROM readings WHERE id = $1 AND user_id = $2"
@@ -105,13 +97,9 @@ pub async fn get_reading(
 
 pub async fn create_reading(
     State(pool): State<DbPool>,
-    request: Request,
+    claims: Claims,
     Json(payload): Json<CreateReading>,
 ) -> AppResult<Json<Reading>> {
-    let claims = request
-        .extensions()
-        .get::<Claims>()
-        .ok_or_else(|| AppError::Authentication("No claims found".to_string()))?;
 
     payload
         .validate()
@@ -162,13 +150,9 @@ pub async fn create_reading(
 pub async fn update_reading(
     State(pool): State<DbPool>,
     Path(reading_id): Path<i32>,
-    request: Request,
+    claims: Claims,
     Json(payload): Json<UpdateReading>,
 ) -> AppResult<Json<Reading>> {
-    let claims = request
-        .extensions()
-        .get::<Claims>()
-        .ok_or_else(|| AppError::Authentication("No claims found".to_string()))?;
 
     payload
         .validate()
@@ -241,12 +225,8 @@ pub async fn update_reading(
 pub async fn delete_reading(
     State(pool): State<DbPool>,
     Path(reading_id): Path<i32>,
-    request: Request,
+    claims: Claims,
 ) -> AppResult<Json<serde_json::Value>> {
-    let claims = request
-        .extensions()
-        .get::<Claims>()
-        .ok_or_else(|| AppError::Authentication("No claims found".to_string()))?;
 
     let result = sqlx::query("DELETE FROM readings WHERE id = $1 AND user_id = $2")
         .bind(reading_id)
@@ -266,13 +246,9 @@ pub async fn delete_reading(
 pub async fn complete_reading(
     State(pool): State<DbPool>,
     Path(reading_id): Path<i32>,
-    request: Request,
+    claims: Claims,
     Json(payload): Json<CompleteReading>,
 ) -> AppResult<Json<Reading>> {
-    let claims = request
-        .extensions()
-        .get::<Claims>()
-        .ok_or_else(|| AppError::Authentication("No claims found".to_string()))?;
 
     payload
         .validate()
@@ -311,12 +287,8 @@ pub async fn complete_reading(
 
 pub async fn get_reading_stats(
     State(pool): State<DbPool>,
-    request: Request,
+    claims: Claims,
 ) -> AppResult<Json<ReadingStats>> {
-    let claims = request
-        .extensions()
-        .get::<Claims>()
-        .ok_or_else(|| AppError::Authentication("No claims found".to_string()))?;
 
     // Total readings
     let total_readings: (i64,) = sqlx::query_as(

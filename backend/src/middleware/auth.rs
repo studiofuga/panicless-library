@@ -1,6 +1,6 @@
 use axum::{
-    extract::{Request, State},
-    http::header::AUTHORIZATION,
+    extract::{FromRequestParts, Request, State},
+    http::{header::AUTHORIZATION, request::Parts},
     middleware::Next,
     response::Response,
 };
@@ -93,15 +93,20 @@ pub async fn auth_middleware(
     Ok(next.run(request).await)
 }
 
-// Extension trait to extract claims from request
-pub trait ClaimsExt {
-    fn claims(&self) -> &Claims;
-}
+// Custom extractor for Claims that works with FromRequestParts
+// This allows handlers to extract Claims without consuming the full Request
+#[axum::async_trait]
+impl<S> FromRequestParts<S> for Claims
+where
+    S: Send + Sync,
+{
+    type Rejection = AppError;
 
-impl ClaimsExt for Request {
-    fn claims(&self) -> &Claims {
-        self.extensions()
+    async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
+        parts
+            .extensions
             .get::<Claims>()
-            .expect("Claims not found in request extensions")
+            .cloned()
+            .ok_or_else(|| AppError::Authentication("No claims found".to_string()))
     }
 }

@@ -1,5 +1,6 @@
 # Build stage
-FROM rust:1.75-slim as builder
+# Using 1.85 for edition 2024 support (base64ct) and home 0.5.11 (pinned)
+FROM rust:1.85-slim as builder
 
 # Install build dependencies
 RUN apt-get update && apt-get install -y \
