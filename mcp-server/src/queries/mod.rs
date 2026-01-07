@@ -19,7 +19,7 @@ pub struct Book {
     pub updated_at: DateTime<Utc>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, FromRow)]
 pub struct BookWithReadings {
     pub id: i32,
     pub title: String,
@@ -87,12 +87,12 @@ pub async fn search_books(
 
     if let Some(q) = query {
         let search_pattern = format!("%{}%", q);
-        query_builder = query_builder.bind(&search_pattern);
+        query_builder = query_builder.bind(search_pattern);
     }
 
     if let Some(a) = author {
         let author_pattern = format!("%{}%", a);
-        query_builder = query_builder.bind(&author_pattern);
+        query_builder = query_builder.bind(author_pattern);
     }
 
     if let Some(y) = year {
@@ -107,9 +107,8 @@ pub async fn get_book_with_readings(
     user_id: i32,
     book_id: i32,
 ) -> Result<Option<BookWithReadings>, sqlx::Error> {
-    let result = sqlx::query!(
-        r#"
-        SELECT
+    sqlx::query_as::<_, BookWithReadings>(
+        "SELECT
             b.id,
             b.title,
             b.author,
@@ -120,7 +119,7 @@ pub async fn get_book_with_readings(
             b.pages,
             b.language,
             b.description,
-            COUNT(r.id) as "reading_count!",
+            COUNT(r.id) as reading_count,
             STRING_AGG(
                 CASE
                     WHEN r.end_date IS NULL THEN CONCAT('Currently reading (started ', r.start_date, ')')
@@ -132,28 +131,12 @@ pub async fn get_book_with_readings(
         FROM books b
         LEFT JOIN readings r ON b.id = r.book_id
         WHERE b.id = $1 AND b.user_id = $2
-        GROUP BY b.id
-        "#,
-        book_id,
-        user_id
+        GROUP BY b.id"
     )
+    .bind(book_id)
+    .bind(user_id)
     .fetch_optional(pool)
-    .await?;
-
-    Ok(result.map(|r| BookWithReadings {
-        id: r.id,
-        title: r.title,
-        author: r.author,
-        edition: r.edition,
-        isbn: r.isbn,
-        publication_year: r.publication_year,
-        publisher: r.publisher,
-        pages: r.pages,
-        language: r.language,
-        description: r.description,
-        reading_count: r.reading_count,
-        readings_summary: r.readings_summary,
-    }))
+    .await
 }
 
 pub async fn list_readings(

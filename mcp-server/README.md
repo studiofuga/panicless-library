@@ -19,7 +19,7 @@ The [Model Context Protocol](https://modelcontextprotocol.io) is an open protoco
 
 ## Prerequisites
 
-- Rust 1.75+ (2021 edition)
+- Rust 1.85+ (edition 2021, supports edition 2024 dependencies)
 - PostgreSQL database (from main project)
 - MCP-compatible AI client (Claude Desktop, etc.)
 
