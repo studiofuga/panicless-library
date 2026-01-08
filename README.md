@@ -124,7 +124,7 @@ For active development, you may want to run services individually.
 
 #### Prerequisites
 
-- **Rust** 1.75+ ([Install Rust](https://rustup.rs/))
+- **Rust** 1.85+ ([Install Rust](https://rustup.rs/))
 - **Node.js** 18+ and npm ([Install Node](https://nodejs.org/))
 - **PostgreSQL** 16+ (or Docker)
 - **Git**

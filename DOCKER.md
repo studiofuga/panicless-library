@@ -151,7 +151,7 @@ Also update in docker-compose.yml:
 
 ```dockerfile
 # Stage 1: Build Rust binary
-FROM rust:1.75-slim
+FROM rust:1.85-slim  # For edition 2024 support
 COPY . .
 RUN cargo build --release
 
