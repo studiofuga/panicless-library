@@ -53,11 +53,12 @@ pub fn transform_record(record: &GoodreadsRecord) -> Result<TransformedBook, Str
         .or(record.year_published.as_ref())
         .and_then(|y| parse_year(y));
 
-    // Parse pages
+    // Parse pages (ignore 0 values as pages must be > 0)
     let pages = record
         .number_of_pages
         .as_ref()
-        .and_then(|p| parse_integer(p));
+        .and_then(|p| parse_integer(p))
+        .filter(|&p| p > 0);
 
     // Publisher
     let publisher = record
@@ -89,7 +90,12 @@ pub fn transform_record(record: &GoodreadsRecord) -> Result<TransformedBook, Str
         "read" => {
             // For read books, use date_read as end_date, fallback to date_added
             let end = date_read.or(date_added);
-            let start = date_added.or(end);
+
+            // Only use date_added as start_date if it's before date_read
+            let start = match (date_added, date_read) {
+                (Some(added), Some(read)) if added < read => Some(added),
+                _ => None,
+            };
             (start, end)
         }
         "currently-reading" => {
@@ -239,5 +245,213 @@ mod tests {
         );
         assert_eq!(combine_notes(&None, &None), None);
         assert_eq!(combine_notes(&Some("".to_string()), &Some("".to_string())), None);
+    }
+
+    #[test]
+    fn test_transform_read_book_date_added_before_date_read() {
+        // Book added before completion: start_date should be date_added
+        let record = GoodreadsRecord {
+            book_id: "1".to_string(),
+            title: "Test Book".to_string(),
+            author: None,
+            author_lf: None,
+            additional_authors: None,
+            isbn: None,
+            isbn13: None,
+            my_rating: "0".to_string(),
+            average_rating: None,
+            publisher: None,
+            binding: None,
+            number_of_pages: None,
+            year_published: None,
+            original_publication_year: None,
+            date_read: Some("2024/01/15".to_string()),
+            date_added: Some("2024/01/01".to_string()),
+            bookshelves: None,
+            bookshelves_with_positions: None,
+            exclusive_shelf: "read".to_string(),
+            my_review: None,
+            spoiler: None,
+            private_notes: None,
+            read_count: None,
+            owned_copies: None,
+        };
+
+        let result = transform_record(&record).unwrap();
+        assert_eq!(result.start_date, Some(NaiveDate::from_ymd_opt(2024, 1, 1).unwrap()));
+        assert_eq!(result.end_date, Some(NaiveDate::from_ymd_opt(2024, 1, 15).unwrap()));
+    }
+
+    #[test]
+    fn test_transform_read_book_date_added_after_date_read() {
+        // Book added after completion: start_date should be None (book was added later)
+        let record = GoodreadsRecord {
+            book_id: "2".to_string(),
+            title: "Test Book".to_string(),
+            author: None,
+            author_lf: None,
+            additional_authors: None,
+            isbn: None,
+            isbn13: None,
+            my_rating: "0".to_string(),
+            average_rating: None,
+            publisher: None,
+            binding: None,
+            number_of_pages: None,
+            year_published: None,
+            original_publication_year: None,
+            date_read: Some("2024/01/15".to_string()),
+            date_added: Some("2024/01/20".to_string()),
+            bookshelves: None,
+            bookshelves_with_positions: None,
+            exclusive_shelf: "read".to_string(),
+            my_review: None,
+            spoiler: None,
+            private_notes: None,
+            read_count: None,
+            owned_copies: None,
+        };
+
+        let result = transform_record(&record).unwrap();
+        assert_eq!(result.start_date, None);
+        assert_eq!(result.end_date, Some(NaiveDate::from_ymd_opt(2024, 1, 15).unwrap()));
+    }
+
+    #[test]
+    fn test_transform_read_book_no_date_read() {
+        // Book with no read date: start_date should be None, end_date should be date_added
+        let record = GoodreadsRecord {
+            book_id: "3".to_string(),
+            title: "Test Book".to_string(),
+            author: None,
+            author_lf: None,
+            additional_authors: None,
+            isbn: None,
+            isbn13: None,
+            my_rating: "0".to_string(),
+            average_rating: None,
+            publisher: None,
+            binding: None,
+            number_of_pages: None,
+            year_published: None,
+            original_publication_year: None,
+            date_read: None,
+            date_added: Some("2024/01/10".to_string()),
+            bookshelves: None,
+            bookshelves_with_positions: None,
+            exclusive_shelf: "read".to_string(),
+            my_review: None,
+            spoiler: None,
+            private_notes: None,
+            read_count: None,
+            owned_copies: None,
+        };
+
+        let result = transform_record(&record).unwrap();
+        assert_eq!(result.start_date, None);
+        assert_eq!(result.end_date, Some(NaiveDate::from_ymd_opt(2024, 1, 10).unwrap()));
+    }
+
+    #[test]
+    fn test_transform_read_book_same_date() {
+        // Book read on the same day it was added: start_date should be None
+        let record = GoodreadsRecord {
+            book_id: "4".to_string(),
+            title: "Test Book".to_string(),
+            author: None,
+            author_lf: None,
+            additional_authors: None,
+            isbn: None,
+            isbn13: None,
+            my_rating: "0".to_string(),
+            average_rating: None,
+            publisher: None,
+            binding: None,
+            number_of_pages: None,
+            year_published: None,
+            original_publication_year: None,
+            date_read: Some("2024/01/15".to_string()),
+            date_added: Some("2024/01/15".to_string()),
+            bookshelves: None,
+            bookshelves_with_positions: None,
+            exclusive_shelf: "read".to_string(),
+            my_review: None,
+            spoiler: None,
+            private_notes: None,
+            read_count: None,
+            owned_copies: None,
+        };
+
+        let result = transform_record(&record).unwrap();
+        assert_eq!(result.start_date, None);
+        assert_eq!(result.end_date, Some(NaiveDate::from_ymd_opt(2024, 1, 15).unwrap()));
+    }
+
+    #[test]
+    fn test_pages_zero_filtered_out() {
+        // Pages with 0 value should be filtered out (None)
+        let record = GoodreadsRecord {
+            book_id: "5".to_string(),
+            title: "Test Book".to_string(),
+            author: None,
+            author_lf: None,
+            additional_authors: None,
+            isbn: None,
+            isbn13: None,
+            my_rating: "0".to_string(),
+            average_rating: None,
+            publisher: None,
+            binding: None,
+            number_of_pages: Some("0".to_string()),
+            year_published: None,
+            original_publication_year: None,
+            date_read: None,
+            date_added: None,
+            bookshelves: None,
+            bookshelves_with_positions: None,
+            exclusive_shelf: "to-read".to_string(),
+            my_review: None,
+            spoiler: None,
+            private_notes: None,
+            read_count: None,
+            owned_copies: None,
+        };
+
+        let result = transform_record(&record).unwrap();
+        assert_eq!(result.pages, None);
+    }
+
+    #[test]
+    fn test_pages_positive_kept() {
+        // Pages with positive value should be kept
+        let record = GoodreadsRecord {
+            book_id: "6".to_string(),
+            title: "Test Book".to_string(),
+            author: None,
+            author_lf: None,
+            additional_authors: None,
+            isbn: None,
+            isbn13: None,
+            my_rating: "0".to_string(),
+            average_rating: None,
+            publisher: None,
+            binding: None,
+            number_of_pages: Some("256".to_string()),
+            year_published: None,
+            original_publication_year: None,
+            date_read: None,
+            date_added: None,
+            bookshelves: None,
+            bookshelves_with_positions: None,
+            exclusive_shelf: "to-read".to_string(),
+            my_review: None,
+            spoiler: None,
+            private_notes: None,
+            read_count: None,
+            owned_copies: None,
+        };
+
+        let result = transform_record(&record).unwrap();
+        assert_eq!(result.pages, Some(256));
     }
 }
