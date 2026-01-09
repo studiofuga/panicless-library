@@ -27,6 +27,10 @@ pub fn get_tool_definitions() -> Vec<ToolDefinition> {
                     "year": {
                         "type": "integer",
                         "description": "Filter by publication year (optional)"
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Maximum number of results to return (optional)"
                     }
                 },
                 "required": ["user_id"]
@@ -197,8 +201,9 @@ async fn list_readings(pool: &PgPool, args: Value) -> Result<ToolCallResult, Str
     let user_id = args["user_id"].as_i64().ok_or("user_id is required")? as i32;
     let status = args["status"].as_str();
     let year = args["year"].as_i64().map(|y| y as i32);
+    let limit = args["limit"].as_i64().map(|l| l as usize);
 
-    let readings = queries::list_readings(pool, user_id, status, year)
+    let readings = queries::list_readings(pool, user_id, status, year, limit)
         .await
         .map_err(|e| e.to_string())?;
 

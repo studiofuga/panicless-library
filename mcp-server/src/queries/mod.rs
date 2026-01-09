@@ -144,6 +144,7 @@ pub async fn list_readings(
     user_id: i32,
     status: Option<&str>,
     year: Option<i32>,
+    limit: Option<usize>
 ) -> Result<Vec<Reading>, sqlx::Error> {
     let mut sql = String::from(
         "SELECT r.id, r.user_id, r.book_id, r.start_date, r.end_date, r.rating, r.notes,
@@ -163,7 +164,11 @@ pub async fn list_readings(
         sql.push_str(" AND (EXTRACT(YEAR FROM r.start_date) = $2 OR EXTRACT(YEAR FROM r.end_date) = $2)");
     }
 
-    sql.push_str(" ORDER BY r.start_date DESC LIMIT 100");
+    sql.push_str(" ORDER BY r.start_date DESC");
+
+    if let Some(l) = limit {
+        sql.push_str(&format!(" LIMIT {}", l));
+    }
 
     let mut query_builder = sqlx::query_as::<_, Reading>(&sql).bind(user_id);
 
