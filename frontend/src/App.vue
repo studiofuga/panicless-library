@@ -16,6 +16,7 @@
                     <n-button text tag="a" @click="$router.push('/dashboard')">Dashboard</n-button>
                     <n-button text tag="a" @click="$router.push('/books')">Books</n-button>
                     <n-button text tag="a" @click="$router.push('/readings')">Readings</n-button>
+                    <n-button text tag="a" @click="$router.push('/import')">Import</n-button>
                     <n-button text tag="a" @click="handleLogout">Logout</n-button>
                   </n-space>
                   <n-space v-else>

@@ -5,6 +5,7 @@ pub mod handlers;
 pub mod middleware;
 pub mod models;
 pub mod routes;
+pub mod services;
 
 pub use config::Config;
 pub use db::{create_pool, DbPool};

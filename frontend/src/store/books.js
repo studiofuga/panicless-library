@@ -84,6 +84,28 @@ export const useBooksStore = defineStore('books', () => {
     }
   }
 
+  async function importGoodreadsCSV(file) {
+    loading.value = true
+    error.value = null
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const response = await apiClient.post('/api/import/goodreads/csv', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      })
+
+      return response.data
+    } catch (err) {
+      error.value = err.response?.data?.message || 'Failed to import CSV'
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
   return {
     books,
     currentBook,
@@ -93,6 +115,7 @@ export const useBooksStore = defineStore('books', () => {
     fetchBook,
     createBook,
     updateBook,
-    deleteBook
+    deleteBook,
+    importGoodreadsCSV
   }
 })

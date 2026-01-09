@@ -43,6 +43,12 @@ const routes = [
     name: 'Readings',
     component: () => import('@/views/ReadingTracker.vue'),
     meta: { requiresAuth: true }
+  },
+  {
+    path: '/import',
+    name: 'Import',
+    component: () => import('@/views/GoodreadsImport.vue'),
+    meta: { requiresAuth: true }
   }
 ]
 
