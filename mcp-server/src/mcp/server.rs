@@ -146,7 +146,9 @@ impl MCPServer {
             }
         };
 
-        match tools::execute_tool(&self.pool, &params.name, params.arguments).await {
+        // Note: user_id would need to come from somewhere (e.g., JWT claims in HTTP context)
+        // For backward compatibility with old stdio-based server, use user_id 0
+        match tools::execute_tool(&self.pool, &params.name, params.arguments, 0).await {
             Ok(result) => {
                 serde_json::to_value(JsonRpcResponse::success(
                     id,

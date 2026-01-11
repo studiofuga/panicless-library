@@ -218,24 +218,24 @@ pub async fn execute_tool(
     pool: &PgPool,
     name: &str,
     arguments: Option<Value>,
+    user_id: i32,
 ) -> Result<ToolCallResult, String> {
-    let args = arguments.ok_or("Missing arguments")?;
+    let args = arguments.unwrap_or(serde_json::json!({}));
 
     match name {
-        "search_books" => search_books(pool, args).await,
-        "get_book_details" => get_book_details(pool, args).await,
-        "list_readings" => list_readings(pool, args).await,
-        "get_reading_statistics" => get_reading_statistics(pool, args).await,
-        "find_similar_books" => find_similar_books(pool, args).await,
-        "create_book" => create_book(pool, args).await,
-        "create_reading" => create_reading(pool, args).await,
-        "update_reading_review" => update_reading_review(pool, args).await,
+        "search_books" => search_books(pool, args, user_id).await,
+        "get_book_details" => get_book_details(pool, args, user_id).await,
+        "list_readings" => list_readings(pool, args, user_id).await,
+        "get_reading_statistics" => get_reading_statistics(pool, args, user_id).await,
+        "find_similar_books" => find_similar_books(pool, args, user_id).await,
+        "create_book" => create_book(pool, args, user_id).await,
+        "create_reading" => create_reading(pool, args, user_id).await,
+        "update_reading_review" => update_reading_review(pool, args, user_id).await,
         _ => Err(format!("Unknown tool: {}", name)),
     }
 }
 
-async fn search_books(pool: &PgPool, args: Value) -> Result<ToolCallResult, String> {
-    let user_id = args["user_id"].as_i64().ok_or("user_id is required")? as i32;
+async fn search_books(pool: &PgPool, args: Value, user_id: i32) -> Result<ToolCallResult, String> {
     let query = args["query"].as_str();
     let author = args["author"].as_str();
     let year = args["year"].as_i64().map(|y| y as i32);
@@ -268,8 +268,7 @@ async fn search_books(pool: &PgPool, args: Value) -> Result<ToolCallResult, Stri
     })
 }
 
-async fn get_book_details(pool: &PgPool, args: Value) -> Result<ToolCallResult, String> {
-    let user_id = args["user_id"].as_i64().ok_or("user_id is required")? as i32;
+async fn get_book_details(pool: &PgPool, args: Value, user_id: i32) -> Result<ToolCallResult, String> {
     let book_id = args["book_id"].as_i64().ok_or("book_id is required")? as i32;
 
     let book = queries::get_book_with_readings(pool, user_id, book_id)
@@ -298,8 +297,7 @@ async fn get_book_details(pool: &PgPool, args: Value) -> Result<ToolCallResult, 
     })
 }
 
-async fn list_readings(pool: &PgPool, args: Value) -> Result<ToolCallResult, String> {
-    let user_id = args["user_id"].as_i64().ok_or("user_id is required")? as i32;
+async fn list_readings(pool: &PgPool, args: Value, user_id: i32) -> Result<ToolCallResult, String> {
     let status = args["status"].as_str();
     let year = args["year"].as_i64().map(|y| y as i32);
     let limit = args["limit"].as_i64().map(|l| l as usize);
@@ -333,8 +331,7 @@ async fn list_readings(pool: &PgPool, args: Value) -> Result<ToolCallResult, Str
     })
 }
 
-async fn get_reading_statistics(pool: &PgPool, args: Value) -> Result<ToolCallResult, String> {
-    let user_id = args["user_id"].as_i64().ok_or("user_id is required")? as i32;
+async fn get_reading_statistics(pool: &PgPool, args: Value, user_id: i32) -> Result<ToolCallResult, String> {
 
     let stats = queries::get_reading_stats(pool, user_id)
         .await
@@ -363,8 +360,7 @@ async fn get_reading_statistics(pool: &PgPool, args: Value) -> Result<ToolCallRe
     })
 }
 
-async fn find_similar_books(pool: &PgPool, args: Value) -> Result<ToolCallResult, String> {
-    let user_id = args["user_id"].as_i64().ok_or("user_id is required")? as i32;
+async fn find_similar_books(pool: &PgPool, args: Value, user_id: i32) -> Result<ToolCallResult, String> {
     let book_id = args["book_id"].as_i64().ok_or("book_id is required")? as i32;
 
     let similar = queries::find_similar_books(pool, user_id, book_id)
@@ -393,8 +389,7 @@ async fn find_similar_books(pool: &PgPool, args: Value) -> Result<ToolCallResult
     })
 }
 
-async fn create_book(pool: &PgPool, args: Value) -> Result<ToolCallResult, String> {
-    let user_id = args["user_id"].as_i64().ok_or("user_id is required")? as i32;
+async fn create_book(pool: &PgPool, args: Value, user_id: i32) -> Result<ToolCallResult, String> {
     let title = args["title"].as_str().ok_or("title is required")?;
     let author = args["author"].as_str();
     let isbn = args["isbn"].as_str();
@@ -434,10 +429,8 @@ async fn create_book(pool: &PgPool, args: Value) -> Result<ToolCallResult, Strin
     })
 }
 
-async fn create_reading(pool: &PgPool, args: Value) -> Result<ToolCallResult, String> {
+async fn create_reading(pool: &PgPool, args: Value, user_id: i32) -> Result<ToolCallResult, String> {
     use chrono::NaiveDate;
-
-    let user_id = args["user_id"].as_i64().ok_or("user_id is required")? as i32;
     let book_id = args["book_id"].as_i64().ok_or("book_id is required")? as i32;
     let start_date_str = args["start_date"].as_str().ok_or("start_date is required")?;
     let end_date_str = args["end_date"].as_str();
@@ -472,8 +465,7 @@ async fn create_reading(pool: &PgPool, args: Value) -> Result<ToolCallResult, St
     })
 }
 
-async fn update_reading_review(pool: &PgPool, args: Value) -> Result<ToolCallResult, String> {
-    let user_id = args["user_id"].as_i64().ok_or("user_id is required")? as i32;
+async fn update_reading_review(pool: &PgPool, args: Value, user_id: i32) -> Result<ToolCallResult, String> {
     let reading_id = args["reading_id"].as_i64().ok_or("reading_id is required")? as i32;
     let rating = args["rating"].as_i64().map(|r| r as i32);
     let notes = args["notes"].as_str();
