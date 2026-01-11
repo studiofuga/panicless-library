@@ -10,6 +10,7 @@ pub struct Config {
     pub server_port: u16,
     pub cors_allowed_origins: Vec<String>,
     pub environment: String,
+    pub encryption_key: String,
 }
 
 impl Config {
@@ -46,6 +47,9 @@ impl Config {
         let environment = env::var("ENVIRONMENT")
             .unwrap_or_else(|_| "development".to_string());
 
+        let encryption_key = env::var("ENCRYPTION_KEY")
+            .expect("ENCRYPTION_KEY must be set");
+
         Ok(Config {
             database_url,
             jwt_secret,
@@ -55,6 +59,7 @@ impl Config {
             server_port,
             cors_allowed_origins,
             environment,
+            encryption_key,
         })
     }
 

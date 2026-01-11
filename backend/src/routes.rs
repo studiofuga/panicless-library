@@ -69,6 +69,12 @@ pub fn create_router(pool: DbPool, config: Config) -> Router {
         .route("/api/readings/:id", delete(handlers::delete_reading))
         .route("/api/readings/:id/complete", patch(handlers::complete_reading))
         .route("/api/readings/stats", get(handlers::get_reading_stats))
+        // Connectors
+        .route("/api/connectors", get(handlers::list_connectors))
+        .route("/api/connectors", post(handlers::create_or_update_connector))
+        .route("/api/connectors/:provider", get(handlers::get_connector))
+        .route("/api/connectors/:provider", delete(handlers::delete_connector))
+        .route("/api/connectors/:provider/toggle", patch(handlers::toggle_connector))
         // Import
         .route("/api/import/goodreads/csv", post(handlers::import_goodreads_csv))
         // Apply authentication middleware to all protected routes
