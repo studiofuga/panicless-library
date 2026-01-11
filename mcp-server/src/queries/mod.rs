@@ -255,3 +255,76 @@ pub async fn find_similar_books(
     .fetch_all(pool)
     .await
 }
+
+pub async fn insert_book(
+    pool: &PgPool,
+    user_id: i32,
+    title: &str,
+    author: Option<&str>,
+    isbn: Option<&str>,
+    publication_year: Option<i32>,
+    publisher: Option<&str>,
+    pages: Option<i32>,
+    language: Option<&str>,
+    description: Option<&str>,
+) -> Result<i32, sqlx::Error> {
+    let result = sqlx::query_scalar::<_, i32>(
+        "INSERT INTO books (user_id, title, author, isbn, publication_year, publisher, pages, language, description, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
+         RETURNING id"
+    )
+    .bind(user_id)
+    .bind(title)
+    .bind(author)
+    .bind(isbn)
+    .bind(publication_year)
+    .bind(publisher)
+    .bind(pages)
+    .bind(language)
+    .bind(description)
+    .fetch_one(pool)
+    .await?;
+    Ok(result)
+}
+
+pub async fn insert_reading(
+    pool: &PgPool,
+    user_id: i32,
+    book_id: i32,
+    start_date: NaiveDate,
+    end_date: Option<NaiveDate>,
+) -> Result<i32, sqlx::Error> {
+    let result = sqlx::query_scalar::<_, i32>(
+        "INSERT INTO readings (user_id, book_id, start_date, end_date, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, NOW(), NOW())
+         RETURNING id"
+    )
+    .bind(user_id)
+    .bind(book_id)
+    .bind(start_date)
+    .bind(end_date)
+    .fetch_one(pool)
+    .await?;
+    Ok(result)
+}
+
+pub async fn update_reading_review(
+    pool: &PgPool,
+    user_id: i32,
+    reading_id: i32,
+    rating: Option<i32>,
+    notes: Option<&str>,
+) -> Result<bool, sqlx::Error> {
+    let result = sqlx::query(
+        "UPDATE readings SET rating = COALESCE($1, rating), notes = COALESCE($2, notes), updated_at = NOW()
+         WHERE id = $3 AND user_id = $4"
+    )
+    .bind(rating)
+    .bind(notes)
+    .bind(reading_id)
+    .bind(user_id)
+    .execute(pool)
+    .await?;
+
+    Ok(result.rows_affected() > 0)
+}
