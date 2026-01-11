@@ -49,6 +49,12 @@ const routes = [
     name: 'Import',
     component: () => import('@/views/GoodreadsImport.vue'),
     meta: { requiresAuth: true }
+  },
+  {
+    path: '/settings',
+    name: 'Settings',
+    component: () => import('@/views/Settings.vue'),
+    meta: { requiresAuth: true }
   }
 ]
 
