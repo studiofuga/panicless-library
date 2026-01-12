@@ -1,12 +1,21 @@
 import axios from 'axios'
 import { useAuthStore } from '@/store/auth'
+import { loadConfig, getApiBaseURL } from './config'
 
+// Create axios instance with runtime config
+// baseURL will be set after config is loaded
 const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080',
   headers: {
     'Content-Type': 'application/json',
   },
 })
+
+// Initialize API client with runtime config
+export async function initializeApiClient() {
+  const config = await loadConfig()
+  apiClient.defaults.baseURL = config.apiBaseURL
+  return apiClient
+}
 
 // Request interceptor to add JWT token
 apiClient.interceptors.request.use(
