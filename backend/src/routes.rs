@@ -44,12 +44,16 @@ pub fn create_router(pool: DbPool, config: Config) -> Router {
     let public_routes = Router::new()
         .route("/api/auth/register", post(handlers::register))
         .route("/api/auth/login", post(handlers::login))
-        .route("/api/auth/refresh", post(handlers::refresh));
+        .route("/api/auth/refresh", post(handlers::refresh))
+        // OAuth2 token endpoint (no auth required, uses client credentials)
+        .route("/oauth/token", post(handlers::token));
 
     // Protected routes (authentication required)
     let protected_routes = Router::new()
         // Auth
         .route("/api/auth/me", get(handlers::get_current_user))
+        // OAuth2 authorize endpoint (requires authentication)
+        .route("/oauth/authorize", post(handlers::authorize))
         // Users
         .route("/api/users/:id", get(handlers::get_user))
         .route("/api/users/:id", put(handlers::update_user))
@@ -83,15 +87,16 @@ pub fn create_router(pool: DbPool, config: Config) -> Router {
             auth_middleware,
         ));
 
-    // Health check endpoint (no auth required)
-    let health_routes = Router::new()
-        .route("/health", get(|| async { "OK" }));
+    // Public metadata endpoints (no auth required)
+    let public_metadata_routes = Router::new()
+        .route("/health", get(|| async { "OK" }))
+        .route("/openapi.json", get(handlers::openapi_schema));
 
     // Combine all routes
     Router::new()
         .merge(public_routes)
         .merge(protected_routes)
-        .merge(health_routes)
+        .merge(public_metadata_routes)
         .layer(cors)
         .with_state(state)
 }

@@ -1,0 +1,12 @@
+target/
+.git/
+.gitignore
+.env.local
+.DS_Store
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+README.md
+.env.example
