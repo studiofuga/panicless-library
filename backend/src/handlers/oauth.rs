@@ -4,7 +4,7 @@ use axum::{
     Json,
 };
 use serde::{Deserialize, Serialize};
-use sqlx::PgPool;
+use sqlx::{PgPool, Row};
 use chrono::Utc;
 use rand::Rng;
 use jsonwebtoken::{encode, EncodingKey, Header};
@@ -74,18 +74,15 @@ pub async fn authorize(
     // Store authorization code in database (expires in 10 minutes)
     let expires_at = Utc::now() + chrono::Duration::minutes(10);
 
-    sqlx::query!(
-        r#"
-        INSERT INTO oauth_codes (code, client_id, user_id, redirect_uri, scope, expires_at)
-        VALUES ($1, $2, $3, $4, $5, $6)
-        "#,
-        &code,
-        &params.client_id,
-        claims.sub,
-        &params.redirect_uri,
-        params.scope,
-        expires_at
+    sqlx::query(
+        "INSERT INTO oauth_codes (code, client_id, user_id, redirect_uri, scope, expires_at) VALUES ($1, $2, $3, $4, $5, $6)"
     )
+    .bind(&code)
+    .bind(&params.client_id)
+    .bind(claims.sub)
+    .bind(&params.redirect_uri)
+    .bind(&params.scope)
+    .bind(expires_at)
     .execute(&pool)
     .await?;
 
@@ -122,68 +119,70 @@ pub async fn token(
     }
 
     // Look up authorization code
-    let oauth_code = sqlx::query!(
-        r#"
-        SELECT id, user_id, redirect_uri, scope, expires_at, used_at
-        FROM oauth_codes
-        WHERE code = $1 AND client_id = $2
-        "#,
-        &payload.code,
-        &payload.client_id
+    let oauth_code = sqlx::query(
+        "SELECT id, user_id, redirect_uri, scope, expires_at, used_at FROM oauth_codes WHERE code = $1 AND client_id = $2"
     )
+    .bind(&payload.code)
+    .bind(&payload.client_id)
     .fetch_optional(&pool)
     .await?
     .ok_or_else(|| AppError::Authentication("Authorization code not found".to_string()))?;
 
+    let code_id: i32 = oauth_code.get("id");
+    let user_id: i32 = oauth_code.get("user_id");
+    let redirect_uri: String = oauth_code.get("redirect_uri");
+    let scope: Option<String> = oauth_code.get("scope");
+    let expires_at: chrono::DateTime<Utc> = oauth_code.get("expires_at");
+    let used_at: Option<chrono::DateTime<Utc>> = oauth_code.get("used_at");
+
     // Check if code has expired
-    if oauth_code.expires_at < Utc::now() {
+    if expires_at < Utc::now() {
         return Err(AppError::Validation("Authorization code expired".to_string()));
     }
 
     // Check if code was already used
-    if oauth_code.used_at.is_some() {
+    if used_at.is_some() {
         tracing::warn!("Attempt to reuse authorization code");
         return Err(AppError::Authentication("Authorization code already used".to_string()));
     }
 
     // Check redirect_uri matches
-    if oauth_code.redirect_uri != payload.redirect_uri {
+    if redirect_uri != payload.redirect_uri {
         return Err(AppError::Validation("Redirect URI mismatch".to_string()));
     }
 
     // Mark code as used
-    sqlx::query!(
-        "UPDATE oauth_codes SET used_at = NOW() WHERE id = $1",
-        oauth_code.id
+    sqlx::query(
+        "UPDATE oauth_codes SET used_at = NOW() WHERE id = $1"
     )
+    .bind(code_id)
     .execute(&pool)
     .await?;
 
     // Get user info for JWT
-    let user = sqlx::query!(
-        "SELECT id, username FROM users WHERE id = $1",
-        oauth_code.user_id
+    let user = sqlx::query(
+        "SELECT id, username FROM users WHERE id = $1"
     )
+    .bind(user_id)
     .fetch_one(&pool)
     .await?;
 
+    let username: String = user.get("username");
+
     // Generate access token
     let access_token = generate_token();
-    let expires_at = Utc::now() + chrono::Duration::hours(24);
-    let scope = oauth_code.scope.unwrap_or_else(|| "all".to_string());
+    let token_expires_at = Utc::now() + chrono::Duration::hours(24);
+    let scope_str = scope.unwrap_or_else(|| "all".to_string());
 
     // Store access token
-    sqlx::query!(
-        r#"
-        INSERT INTO oauth_tokens (token, client_id, user_id, scope, expires_at)
-        VALUES ($1, $2, $3, $4, $5)
-        "#,
-        &access_token,
-        &payload.client_id,
-        oauth_code.user_id,
-        &scope,
-        expires_at
+    sqlx::query(
+        "INSERT INTO oauth_tokens (token, client_id, user_id, scope, expires_at) VALUES ($1, $2, $3, $4, $5)"
     )
+    .bind(&access_token)
+    .bind(&payload.client_id)
+    .bind(user_id)
+    .bind(&scope_str)
+    .bind(token_expires_at)
     .execute(&pool)
     .await?;
 
@@ -193,8 +192,8 @@ pub async fn token(
     let iat = now.timestamp() as usize;
 
     let claims = Claims {
-        sub: oauth_code.user_id,
-        username: user.username,
+        sub: user_id,
+        username,
         exp,
         iat,
         token_type: "access".to_string(),
@@ -209,7 +208,7 @@ pub async fn token(
 
     tracing::info!(
         "OAuth access token issued for user {} and client {}",
-        oauth_code.user_id,
+        user_id,
         payload.client_id
     );
 
@@ -219,7 +218,7 @@ pub async fn token(
             access_token,
             token_type: "Bearer".to_string(),
             expires_in: 86400, // 24 hours
-            scope,
+            scope: scope_str,
             jwt_token,
         }),
     ))
