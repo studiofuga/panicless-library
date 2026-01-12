@@ -5,9 +5,9 @@ services:
     image: postgres:16-alpine
     container_name: panicless-postgres
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:postgres}
-      POSTGRES_DB: ${POSTGRES_DB:panicless}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-panicless}
     ports:
       - "5432:5432"
     volumes:
@@ -30,14 +30,16 @@ services:
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-panicless}
       JWT_SECRET: ${JWT_SECRET:-change-this-secret-in-production-use-a-long-random-string-at-least-64-characters}
-      JWT_ACCESS_TOKEN_EXPIRY: 3600
-      JWT_REFRESH_TOKEN_EXPIRY: 604800
+      JWT_ACCESS_TOKEN_EXPIRY: ${JWT_ACCESS_TOKEN_EXPIRY:-3600}
+      JWT_REFRESH_TOKEN_EXPIRY: ${JWT_REFRESH_TOKEN_EXPIRY:-604800}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:-dGVzdC1lbmNyeXB0aW9uLWtleS1jaGFuZ2UtaW4tcHJvZHVjdGlvbi1oZXJl}
       OAUTH_CLIENT_ID: ${OAUTH_CLIENT_ID:-panicless-library-dev}
       OAUTH_CLIENT_SECRET: ${OAUTH_CLIENT_SECRET:-dev-secret-change-in-production}
-      SERVER_HOST: 0.0.0.0
-      SERVER_PORT: 8080
+      SERVER_HOST: ${SERVER_HOST:-0.0.0.0}
+      SERVER_PORT: ${SERVER_PORT:-8080}
       RUST_LOG: ${RUST_LOG:-info}
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:5173}
     ports:
       - "8080:8080"
     depends_on:
@@ -61,8 +63,8 @@ services:
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-panicless}
       JWT_SECRET: ${JWT_SECRET:-change-this-secret-in-production-use-a-long-random-string-at-least-64-characters}
-      MCP_SERVER_HOST: 0.0.0.0
-      MCP_SERVER_PORT: 8081
+      MCP_SERVER_HOST: ${MCP_SERVER_HOST:-0.0.0.0}
+      MCP_SERVER_PORT: ${MCP_SERVER_PORT:-8081}
       RUST_LOG: ${RUST_LOG:-info}
     ports:
       - "8081:8081"
