@@ -44,20 +44,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     tracing::info!("Database connection test successful");
 
-    // Create router with protected and unprotected routes
+    // Create protected routes with JWT middleware
+    let protected_routes = Router::new()
+        .route("/mcp", get(sse::handle_mcp_sse))
+        .route("/mcp", post(sse::handle_mcp_sse_post))
+        .layer(middleware::from_fn_with_state(
+            config.clone(),
+            auth_middleware,
+        ));
+
+    // Create main router with unprotected + protected routes
     let app = Router::new()
         // Unprotected routes
         .route("/health", get(health_check))
         .route("/openapi.json", get(openapi::get_openapi_schema))
-        // Protected routes (require JWT authentication)
-        .route("/mcp", get(sse::handle_mcp_sse))
-        .route("/mcp", post(sse::handle_mcp_sse_post))
-        // Apply authentication middleware to protected routes
-        .layer(middleware::from_fn_with_state(
-            config.clone(),
-            auth_middleware,
-        ))
-        // Add CORS layer
+        // Merge protected routes
+        .merge(protected_routes)
+        // Add CORS layer (applies to all routes)
         .layer(CorsLayer::permissive())
         // Add state
         .with_state(pool);
