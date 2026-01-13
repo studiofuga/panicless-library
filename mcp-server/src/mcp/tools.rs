@@ -331,7 +331,7 @@ async fn list_readings(pool: &PgPool, args: Value, user_id: i32) -> Result<ToolC
     })
 }
 
-async fn get_reading_statistics(pool: &PgPool, args: Value, user_id: i32) -> Result<ToolCallResult, String> {
+async fn get_reading_statistics(pool: &PgPool, _args: Value, user_id: i32) -> Result<ToolCallResult, String> {
 
     let stats = queries::get_reading_stats(pool, user_id)
         .await

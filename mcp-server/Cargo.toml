@@ -40,6 +40,10 @@ http = "1.0"
 jsonwebtoken = "9.2"
 async-trait = "0.1"
 
+# SSE (Server-Sent Events) support
+futures = "0.3"
+tokio-stream = "0.1"
+
 # Pin home to avoid MSRV issues
 # home 0.5.12 requires Rust 1.88 (not yet released)
 # home 0.5.11 requires Rust 1.81

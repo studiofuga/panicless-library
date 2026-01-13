@@ -3,7 +3,7 @@ use axum::{
     extract::{FromRequestParts, Request},
     http::{request::Parts, StatusCode},
     middleware::Next,
-    response::IntoResponse,
+    response::Response,
 };
 use jsonwebtoken::{decode, DecodingKey, Validation};
 use serde::{Deserialize, Serialize};
