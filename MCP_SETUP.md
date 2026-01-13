@@ -126,6 +126,38 @@ All tools are user-scoped - they only return data for your authenticated user:
 ### Analytics
 - **find_similar_books**(book_id, limit): Find similar books to one you're reading
 
+## OAuth2 Flow Verification
+
+To verify the OAuth2 flow works end-to-end:
+
+```bash
+# 1. Get a JWT token from backend login
+JWT=$(curl -s -X POST https://panicless.happycactus.org:8000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"your_user","password":"your_pass"}' | jq -r '.access_token')
+
+# 2. Get authorization code
+CODE=$(curl -s -X POST https://panicless.happycactus.org:8000/oauth/authorize \
+  -H "Authorization: Bearer $JWT" \
+  -H "Content-Type: application/json" \
+  -d '{"client_id":"panicless-library","redirect_uri":"http://localhost/callback","response_type":"code"}' \
+  | jq -r '.code')
+
+# 3. Exchange code for OAuth token (which includes JWT)
+OAUTH_JWT=$(curl -s -X POST https://panicless.happycactus.org:8000/oauth/token \
+  -H "Content-Type: application/json" \
+  -d "{\"client_id\":\"panicless-library\",\"client_secret\":\"YOUR_OAUTH_CLIENT_SECRET\",\"code\":\"$CODE\",\"grant_type\":\"authorization_code\",\"redirect_uri\":\"http://localhost/callback\"}" \
+  | jq -r '.jwt_token')
+
+# 4. Test with MCP server
+curl -s -X POST https://panicless.happycactus.org:8001/mcp \
+  -H "Authorization: Bearer $OAUTH_JWT" \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}' | jq .
+```
+
+If step 2 returns "InvalidSignature" error, your JWT_SECRET configuration is wrong. See the critical note above.
+
 ## Troubleshooting
 
 ### "Invalid content type, expected text/event-stream"

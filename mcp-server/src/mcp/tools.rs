@@ -12,10 +12,6 @@ pub fn get_tool_definitions() -> Vec<ToolDefinition> {
             input_schema: json!({
                 "type": "object",
                 "properties": {
-                    "user_id": {
-                        "type": "integer",
-                        "description": "User ID to search books for"
-                    },
                     "query": {
                         "type": "string",
                         "description": "Search query for title or author (optional)"
@@ -33,7 +29,7 @@ pub fn get_tool_definitions() -> Vec<ToolDefinition> {
                         "description": "Maximum number of results to return (optional)"
                     }
                 },
-                "required": ["user_id"]
+                "required": []
             }),
         },
         ToolDefinition {
@@ -42,16 +38,12 @@ pub fn get_tool_definitions() -> Vec<ToolDefinition> {
             input_schema: json!({
                 "type": "object",
                 "properties": {
-                    "user_id": {
-                        "type": "integer",
-                        "description": "User ID"
-                    },
                     "book_id": {
                         "type": "integer",
                         "description": "Book ID to get details for"
                     }
                 },
-                "required": ["user_id", "book_id"]
+                "required": ["book_id"]
             }),
         },
         ToolDefinition {
@@ -60,10 +52,6 @@ pub fn get_tool_definitions() -> Vec<ToolDefinition> {
             input_schema: json!({
                 "type": "object",
                 "properties": {
-                    "user_id": {
-                        "type": "integer",
-                        "description": "User ID"
-                    },
                     "status": {
                         "type": "string",
                         "enum": ["current", "completed", "all"],
@@ -74,7 +62,7 @@ pub fn get_tool_definitions() -> Vec<ToolDefinition> {
                         "description": "Filter by year (optional)"
                     }
                 },
-                "required": ["user_id"]
+                "required": []
             }),
         },
         ToolDefinition {
@@ -83,16 +71,12 @@ pub fn get_tool_definitions() -> Vec<ToolDefinition> {
             input_schema: json!({
                 "type": "object",
                 "properties": {
-                    "user_id": {
-                        "type": "integer",
-                        "description": "User ID"
-                    },
                     "year": {
                         "type": "integer",
                         "description": "Filter statistics by year (optional)"
                     }
                 },
-                "required": ["user_id"]
+                "required": []
             }),
         },
         ToolDefinition {
@@ -101,16 +85,12 @@ pub fn get_tool_definitions() -> Vec<ToolDefinition> {
             input_schema: json!({
                 "type": "object",
                 "properties": {
-                    "user_id": {
-                        "type": "integer",
-                        "description": "User ID"
-                    },
                     "book_id": {
                         "type": "integer",
                         "description": "Book ID to find similar books for"
                     }
                 },
-                "required": ["user_id", "book_id"]
+                "required": ["book_id"]
             }),
         },
         ToolDefinition {
@@ -119,10 +99,6 @@ pub fn get_tool_definitions() -> Vec<ToolDefinition> {
             input_schema: json!({
                 "type": "object",
                 "properties": {
-                    "user_id": {
-                        "type": "integer",
-                        "description": "User ID"
-                    },
                     "title": {
                         "type": "string",
                         "description": "Book title (required)"
@@ -156,7 +132,7 @@ pub fn get_tool_definitions() -> Vec<ToolDefinition> {
                         "description": "Book description (optional)"
                     }
                 },
-                "required": ["user_id", "title"]
+                "required": ["title"]
             }),
         },
         ToolDefinition {
@@ -165,10 +141,6 @@ pub fn get_tool_definitions() -> Vec<ToolDefinition> {
             input_schema: json!({
                 "type": "object",
                 "properties": {
-                    "user_id": {
-                        "type": "integer",
-                        "description": "User ID"
-                    },
                     "book_id": {
                         "type": "integer",
                         "description": "Book ID to create a reading record for (required)"
@@ -182,7 +154,7 @@ pub fn get_tool_definitions() -> Vec<ToolDefinition> {
                         "description": "End date in YYYY-MM-DD format (optional)"
                     }
                 },
-                "required": ["user_id", "book_id", "start_date"]
+                "required": ["book_id", "start_date"]
             }),
         },
         ToolDefinition {
@@ -191,10 +163,6 @@ pub fn get_tool_definitions() -> Vec<ToolDefinition> {
             input_schema: json!({
                 "type": "object",
                 "properties": {
-                    "user_id": {
-                        "type": "integer",
-                        "description": "User ID"
-                    },
                     "reading_id": {
                         "type": "integer",
                         "description": "Reading record ID (required)"
@@ -208,7 +176,7 @@ pub fn get_tool_definitions() -> Vec<ToolDefinition> {
                         "description": "Review/comment notes (optional)"
                     }
                 },
-                "required": ["user_id", "reading_id"]
+                "required": ["reading_id"]
             }),
         },
     ]
