@@ -52,7 +52,9 @@ fi
 
 # Test PostgreSQL
 echo "🗄️  Testing PostgreSQL..."
-if docker-compose exec -T postgres psql -U panicless -d panicless_library -c "SELECT 1" > /dev/null 2>&1; then
+DB_NAME=${POSTGRES_DB:-panicless}
+DB_USER=${POSTGRES_USER:-postgres}
+if docker-compose exec -T postgres psql -U "$DB_USER" -d "$DB_NAME" -c "SELECT 1" > /dev/null 2>&1; then
     echo -e "${GREEN}✅ PostgreSQL is accessible${NC}"
 else
     echo -e "${RED}❌ PostgreSQL connection failed${NC}"
@@ -87,18 +89,10 @@ else
 fi
 echo ""
 
-# Test Frontend
-echo "🎨 Testing Frontend..."
-if curl -f -s http://localhost:3000/health > /dev/null; then
-    echo -e "${GREEN}✅ Frontend health check passed${NC}"
-else
-    echo -e "${RED}❌ Frontend health check failed${NC}"
-    exit 1
-fi
-
-# Check if frontend serves HTML
-if curl -s http://localhost:3000 | grep -q "<!DOCTYPE html>"; then
-    echo -e "${GREEN}✅ Frontend is serving HTML${NC}"
+# Test Frontend (served from backend)
+echo "🎨 Testing Frontend (served from backend)..."
+if curl -s http://localhost:8080 | grep -q "<!DOCTYPE html>"; then
+    echo -e "${GREEN}✅ Frontend is serving HTML from backend${NC}"
 else
     echo -e "${RED}❌ Frontend not serving HTML correctly${NC}"
     exit 1
@@ -107,7 +101,9 @@ echo ""
 
 # Test database tables exist
 echo "📊 Testing database schema..."
-TABLES=$(docker-compose exec -T postgres psql -U panicless -d panicless_library -t -c "SELECT tablename FROM pg_tables WHERE schemaname='public'" | grep -v "^$" | wc -l)
+DB_NAME=${POSTGRES_DB:-panicless}
+DB_USER=${POSTGRES_USER:-postgres}
+TABLES=$(docker-compose exec -T postgres psql -U "$DB_USER" -d "$DB_NAME" -t -c "SELECT tablename FROM pg_tables WHERE schemaname='public'" | grep -v "^$" | wc -l)
 if [ "$TABLES" -ge 3 ]; then
     echo -e "${GREEN}✅ Database tables exist (found $TABLES tables)${NC}"
 else
@@ -121,11 +117,11 @@ echo "=============================================="
 echo -e "${GREEN}🎉 All tests passed!${NC}"
 echo ""
 echo "You can now access:"
-echo "  Frontend: http://localhost:3000"
-echo "  Backend:  http://localhost:8080"
-echo "  API Docs: http://localhost:8080/health"
+echo "  Frontend & Backend: http://localhost:8080"
+echo "  API Docs:          http://localhost:8080/openapi.json"
+echo "  Health Check:      http://localhost:8080/health"
 echo ""
-echo "To view logs:    make logs"
-echo "To stop:         make down"
-echo "To restart:      make restart"
+echo "To view logs:    docker-compose logs -f"
+echo "To stop:         docker-compose down"
+echo "To restart:      docker-compose restart"
 echo ""

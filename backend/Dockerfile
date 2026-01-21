@@ -1,6 +1,23 @@
-# Build stage
+# Frontend build stage
+FROM node:20-alpine AS frontend-builder
+
+WORKDIR /frontend
+
+# Copy frontend files
+COPY frontend/package*.json ./
+RUN npm ci
+
+COPY frontend/src ./src
+COPY frontend/public ./public
+COPY frontend/index.html ./
+COPY frontend/vite.config.js ./
+
+# Build frontend
+RUN npm run build
+
+# Backend build stage
 # Using 1.85 for edition 2024 support (base64ct) and home 0.5.11 (pinned)
-FROM rust:1.85-slim as builder
+FROM rust:1.85-slim AS backend-builder
 
 # Install build dependencies
 RUN apt-get update && apt-get install -y \
@@ -11,14 +28,14 @@ RUN apt-get update && apt-get install -y \
 # Create a new empty shell project
 WORKDIR /app
 
-# Copy manifests
-COPY Cargo.toml ./
+# Copy workspace files
+COPY Cargo.toml Cargo.lock ./
+COPY panicless-mcp-lib ./panicless-mcp-lib
+COPY mcp-server ./mcp-server
+COPY backend ./backend
 
-# Copy source code
-COPY src ./src
-
-# Build the application in release mode
-RUN cargo build --release
+# Build the backend application in release mode
+RUN cargo build --release --package panicless-backend
 
 # Runtime stage
 FROM debian:bookworm-slim
@@ -35,8 +52,11 @@ RUN useradd -m -u 1000 appuser
 
 WORKDIR /app
 
-# Copy the binary from builder
-COPY --from=builder /app/target/release/panicless-backend /app/panicless-backend
+# Copy the binary from backend builder
+COPY --from=backend-builder /app/target/release/panicless-backend /app/panicless-backend
+
+# Copy frontend dist files from frontend builder
+COPY --from=frontend-builder /frontend/dist ./frontend/dist
 
 # Change ownership
 RUN chown -R appuser:appuser /app

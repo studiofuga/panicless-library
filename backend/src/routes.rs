@@ -1,8 +1,10 @@
 use axum::{
     extract::FromRef,
     middleware,
+    response::IntoResponse,
     routing::{delete, get, patch, post, put},
     Router,
+    http::StatusCode,
 };
 use tower_http::cors::CorsLayer;
 
@@ -100,6 +102,61 @@ pub fn create_router(pool: DbPool, config: Config) -> Router {
         .merge(public_routes)
         .merge(protected_routes)
         .merge(public_metadata_routes)
+        .fallback(fallback_handler)
         .layer(cors)
         .with_state(state)
+}
+
+/// Fallback handler that serves static files or index.html for SPA routing
+async fn fallback_handler(uri: axum::http::Uri) -> impl IntoResponse {
+    let path = uri.path().trim_start_matches('/');
+    let path_without_query = path.split('?').next().unwrap_or(path);
+
+    // Try to serve the static file
+    let file_path = format!("../frontend/dist/{}", path_without_query);
+    if let Ok(content) = tokio::fs::read(&file_path).await {
+        // Get content type based on file extension
+        let content_type = match std::path::Path::new(&file_path)
+            .extension()
+            .and_then(|s| s.to_str())
+        {
+            Some("html") => "text/html",
+            Some("css") => "text/css",
+            Some("js") => "application/javascript",
+            Some("json") => "application/json",
+            Some("svg") => "image/svg+xml",
+            Some("png") => "image/png",
+            Some("jpg") | Some("jpeg") => "image/jpeg",
+            Some("gif") => "image/gif",
+            Some("ico") => "image/x-icon",
+            Some("woff") => "font/woff",
+            Some("woff2") => "font/woff2",
+            Some("ttf") => "font/ttf",
+            _ => "application/octet-stream",
+        };
+
+        return (
+            StatusCode::OK,
+            [(axum::http::header::CONTENT_TYPE, content_type)],
+            content,
+        )
+            .into_response();
+    }
+
+    // If file not found, serve index.html for SPA routing
+    if let Ok(content) = tokio::fs::read_to_string("../frontend/dist/index.html").await {
+        return (
+            StatusCode::OK,
+            [(axum::http::header::CONTENT_TYPE, "text/html; charset=utf-8")],
+            content,
+        )
+            .into_response();
+    }
+
+    // Fallback to 404 if index.html doesn't exist
+    (
+        StatusCode::NOT_FOUND,
+        "Not Found",
+    )
+        .into_response()
 }
