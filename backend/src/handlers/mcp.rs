@@ -5,16 +5,16 @@ use axum::{
 };
 use futures::stream::{self, Stream, StreamExt};
 use serde_json::{json, Value};
-use sqlx::PgPool;
 use std::convert::Infallible;
 
-use crate::auth::Claims;
 use panicless_mcp_lib as mcp;
+
+use crate::{db::DbPool, middleware::auth::Claims};
 
 /// Handle SSE stream for MCP protocol
 /// Claude Desktop remote MCP connectors use SSE for bidirectional communication
 pub async fn handle_mcp_sse(
-    State(_pool): State<PgPool>,
+    State(_pool): State<DbPool>,
     _claims: Claims,
 ) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
 
@@ -26,7 +26,7 @@ pub async fn handle_mcp_sse(
             "method": "initialized",
             "params": {
                 "server_info": {
-                    "name": "panicless-mcp-server",
+                    "name": "panicless-backend-mcp",
                     "version": env!("CARGO_PKG_VERSION")
                 }
             }
@@ -53,11 +53,11 @@ pub async fn handle_mcp_sse(
 
 /// Handle MCP request via POST and return SSE-formatted response
 pub async fn handle_mcp_sse_post(
-    State(pool): State<PgPool>,
+    State(pool): State<DbPool>,
     claims: Claims,
     axum::Json(request): axum::Json<Value>,
 ) -> Result<Sse<impl Stream<Item = Result<Event, Infallible>>>, (StatusCode, String)> {
-    let user_id = claims.user_id();
+    let user_id = claims.sub;
 
     // Validate JSON-RPC 2.0 format
     let request_obj = request
@@ -153,7 +153,7 @@ fn handle_initialize(id: Option<Value>, params: Option<Value>) -> Value {
             },
         },
         server_info: mcp::protocol::ServerInfo {
-            name: "panicless-mcp-server".to_string(),
+            name: "panicless-backend-mcp".to_string(),
             version: env!("CARGO_PKG_VERSION").to_string(),
         },
     };
@@ -178,7 +178,7 @@ fn handle_tools_list(id: Option<Value>) -> Value {
 }
 
 async fn handle_tools_call(
-    pool: &PgPool,
+    pool: &DbPool,
     id: Option<Value>,
     params: Option<Value>,
     user_id: i32,

@@ -1,5 +1,5 @@
-pub mod mcp;
-pub mod queries;
+pub use panicless_mcp_lib;
+
 pub mod config;
 pub mod auth;
 pub mod sse;

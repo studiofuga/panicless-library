@@ -81,6 +81,9 @@ pub fn create_router(pool: DbPool, config: Config) -> Router {
         .route("/api/connectors/:provider/toggle", patch(handlers::toggle_connector))
         // Import
         .route("/api/import/goodreads/csv", post(handlers::import_goodreads_csv))
+        // MCP endpoints (HTTP/SSE for remote access)
+        .route("/mcp", get(handlers::handle_mcp_sse))
+        .route("/mcp", post(handlers::handle_mcp_sse_post))
         // Apply authentication middleware to all protected routes
         .layer(middleware::from_fn_with_state(
             config.clone(),

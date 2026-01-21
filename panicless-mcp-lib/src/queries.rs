@@ -53,7 +53,7 @@ pub struct ReadingStats {
     pub completed_readings: i64,
     pub current_readings: i64,
     pub total_books_read: i64,
-    pub average_rating: Option<bigdecimal::BigDecimal>,
+    pub average_rating: Option<f64>,
     pub books_by_year: Vec<(i32, i64)>,
 }
 
@@ -210,7 +210,7 @@ pub async fn get_reading_stats(
     .fetch_one(pool)
     .await?;
 
-    let avg_rating: (Option<bigdecimal::BigDecimal>,) = sqlx::query_as(
+    let avg_rating: (Option<f64>,) = sqlx::query_as(
         "SELECT AVG(rating) FROM readings WHERE user_id = $1 AND rating IS NOT NULL",
     )
     .bind(user_id)

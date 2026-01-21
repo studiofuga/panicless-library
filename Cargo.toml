@@ -1,0 +1,8 @@
+[workspace]
+members = [
+    "backend",
+    "mcp-server",
+    "panicless-mcp-lib"
+]
+
+resolver = "2"

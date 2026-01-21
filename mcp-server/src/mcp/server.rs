@@ -2,8 +2,7 @@ use serde_json::Value;
 use sqlx::PgPool;
 use std::io::{self, BufRead, Write};
 
-use super::protocol::*;
-use super::tools;
+use panicless_mcp_lib::{protocol::*, tools};
 
 pub struct MCPServer {
     pool: PgPool,

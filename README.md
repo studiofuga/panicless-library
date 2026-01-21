@@ -27,19 +27,35 @@ A full-stack personal library management system with AI integration via Model Co
 
 ```
 panicless-library/
-├── database/          # PostgreSQL migrations and seed data
-├── backend/           # Rust REST API server (Axum + SQLx + JWT)
-├── frontend/          # Vue.js 3 SPA (Vite + Pinia + Naive UI)
-└── mcp-server/        # MCP server for AI assistant integration
+├── database/           # PostgreSQL migrations and seed data
+├── panicless-mcp-lib/  # Shared MCP library (protocol, tools, queries)
+├── backend/            # Rust REST API server (Axum + SQLx + JWT + MCP endpoints)
+├── frontend/           # Vue.js 3 SPA (Vite + Pinia + Naive UI)
+└── mcp-server/         # Standalone MCP server (stdio-based for local Claude Desktop)
 ```
+
+The **panicless-mcp-lib** is a shared Rust library containing all MCP protocol logic and tool implementations. This library is used by both the backend (for HTTP/SSE endpoints) and the mcp-server (for local stdio usage), eliminating code duplication.
 
 ### Technology Stack
 
 - **Database**: PostgreSQL 16
-- **Backend**: Rust (Axum, SQLx, JWT, Argon2)
+- **Backend**: Rust (Axum, SQLx, JWT, Argon2, MCP)
 - **Frontend**: Vue 3, Vite, Pinia, Vue Router, Naive UI
-- **MCP Server**: Rust (JSON-RPC over stdio)
+- **MCP Library**: Shared Rust library with protocol types and tool definitions
+- **MCP Server**: Rust (JSON-RPC over stdio for local Claude Desktop usage)
 - **Development**: Docker Compose for PostgreSQL
+
+### MCP Integration (Two Deployment Options)
+
+1. **Backend MCP (HTTP/SSE)** - For remote access with OAuth2
+   - Endpoint: `http://localhost:8080/mcp` (requires JWT authentication)
+   - Use case: Remote Claude Desktop, web applications
+   - Protocol: HTTP Server-Sent Events (SSE)
+
+2. **Standalone MCP Server (stdio)** - For local Claude Desktop usage
+   - Port: 8081 (HTTP/SSE endpoint) or stdio for direct Claude Desktop integration
+   - Use case: Local development, Claude Desktop integration
+   - Protocol: stdio for direct connection to Claude Desktop
 
 ## Quick Start
 
