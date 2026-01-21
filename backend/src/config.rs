@@ -88,6 +88,7 @@ impl Config {
     pub fn base_url(&self) -> String {
         self.public_base_url
             .clone()
+            .filter(|url| !url.is_empty())
             .unwrap_or_else(|| format!("http://{}:{}", self.server_host, self.server_port))
     }
 }

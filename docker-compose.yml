@@ -35,6 +35,7 @@ services:
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:-dGVzdC1lbmNyeXB0aW9uLWtleS1jaGFuZ2UtaW4tcHJvZHVjdGlvbi1oZXJl}
       OAUTH_CLIENT_ID: ${OAUTH_CLIENT_ID:-panicless-library-dev}
       OAUTH_CLIENT_SECRET: ${OAUTH_CLIENT_SECRET:-dev-secret-change-in-production}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL}
       SERVER_HOST: ${SERVER_HOST:-0.0.0.0}
       SERVER_PORT: ${SERVER_PORT:-8080}
       RUST_LOG: ${RUST_LOG:-info}
