@@ -12,7 +12,7 @@ panicless-mcp-lib = { path = "../panicless-mcp-lib" }
 # Async runtime
 tokio = { version = "1", features = ["full"] }
 
-# Database (read-only)
+# Database
 sqlx = { version = "0.8", features = ["runtime-tokio", "postgres", "chrono"] }
 
 # Serialization
@@ -32,22 +32,3 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 # Time handling
 chrono = { version = "0.4", features = ["serde"] }
-
-# HTTP server (Axum)
-axum = "0.7"
-tower = "0.4"
-tower-http = { version = "0.5", features = ["trace", "cors"] }
-http = "1.0"
-
-# Authentication
-jsonwebtoken = "9.2"
-async-trait = "0.1"
-
-# SSE (Server-Sent Events) support
-futures = "0.3"
-tokio-stream = "0.1"
-
-# Pin home to avoid MSRV issues
-# home 0.5.12 requires Rust 1.88 (not yet released)
-# home 0.5.11 requires Rust 1.81
-home = "=0.5.11"

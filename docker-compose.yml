@@ -53,34 +53,6 @@ services:
       - panicless-network
     restart: unless-stopped
 
-  mcp-server:
-    build:
-      context: ./mcp-server
-      dockerfile: Dockerfile
-    container_name: panicless-mcp-server
-    environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-panicless}
-      JWT_SECRET: ${JWT_SECRET:-change-this-secret-in-production-use-a-long-random-string-at-least-64-characters}
-      MCP_SERVER_HOST: ${MCP_SERVER_HOST:-0.0.0.0}
-      MCP_SERVER_PORT: ${MCP_SERVER_PORT:-8081}
-      RUST_LOG: ${RUST_LOG:-info}
-    ports:
-      - "${MCP_SERVER_PORT_HOST:-8081}:8081"
-    depends_on:
-      postgres:
-        condition: service_healthy
-      backend:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:${MCP_SERVER_PORT:-8081}/health"]
-      interval: 30s
-      timeout: 3s
-      retries: 3
-      start_period: 10s
-    networks:
-      - panicless-network
-    restart: unless-stopped
-
   frontend:
     build:
       context: ./frontend
