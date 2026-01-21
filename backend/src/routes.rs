@@ -95,7 +95,8 @@ pub fn create_router(pool: DbPool, config: Config) -> Router {
     // Public metadata endpoints (no auth required)
     let public_metadata_routes = Router::new()
         .route("/health", get(|| async { "OK" }))
-        .route("/openapi.json", get(handlers::openapi_schema));
+        .route("/openapi.json", get(handlers::openapi_schema))
+        .route("/config.json", get(config_handler));
 
     // Combine all routes
     Router::new()
@@ -164,4 +165,11 @@ async fn fallback_handler(uri: axum::http::Uri) -> impl IntoResponse {
         "Not Found",
     )
         .into_response()
+}
+
+/// Handler for /config.json - returns frontend configuration
+async fn config_handler() -> axum::Json<serde_json::Value> {
+    axum::Json(serde_json::json!({
+        "apiBaseURL": "http://localhost:8080"
+    }))
 }

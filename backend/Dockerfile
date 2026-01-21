@@ -1,6 +1,9 @@
 # Frontend build stage
 FROM node:20-alpine AS frontend-builder
 
+# Build argument for API URL - can be overridden at build time
+ARG VITE_API_BASE_URL=http://localhost:8080
+
 WORKDIR /frontend
 
 # Copy frontend files
@@ -11,8 +14,12 @@ COPY frontend/src ./src
 COPY frontend/index.html ./
 COPY frontend/vite.config.js ./
 
-# Build frontend
+# Build frontend with API URL environment variable
+ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
 RUN npm run build
+
+# Generate config.json in dist directory using the same API URL
+RUN echo "{\"apiBaseURL\":\"${VITE_API_BASE_URL}\"}" > /frontend/dist/config.json
 
 # Backend build stage
 # Using 1.85 for edition 2024 support (base64ct) and home 0.5.11 (pinned)
