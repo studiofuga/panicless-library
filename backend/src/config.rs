@@ -13,6 +13,7 @@ pub struct Config {
     pub encryption_key: String,
     pub oauth_client_id: String,
     pub oauth_client_secret: String,
+    pub public_base_url: Option<String>,
 }
 
 impl Config {
@@ -58,6 +59,8 @@ impl Config {
         let oauth_client_secret = env::var("OAUTH_CLIENT_SECRET")
             .unwrap_or_else(|_| "dev-secret-change-in-production".to_string());
 
+        let public_base_url = env::var("PUBLIC_BASE_URL").ok();
+
         Ok(Config {
             database_url,
             jwt_secret,
@@ -70,6 +73,7 @@ impl Config {
             encryption_key,
             oauth_client_id,
             oauth_client_secret,
+            public_base_url,
         })
     }
 
@@ -79,5 +83,11 @@ impl Config {
 
     pub fn is_production(&self) -> bool {
         self.environment == "production"
+    }
+
+    pub fn base_url(&self) -> String {
+        self.public_base_url
+            .clone()
+            .unwrap_or_else(|| format!("http://{}:{}", self.server_host, self.server_port))
     }
 }

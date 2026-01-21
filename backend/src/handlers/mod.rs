@@ -15,5 +15,5 @@ pub use users::{get_user, update_user, delete_user};
 pub use import::import_goodreads_csv;
 pub use connectors::{create_or_update_connector, list_connectors, get_connector, delete_connector, toggle_connector};
 pub use openapi::openapi_schema;
-pub use oauth::{authorize, token};
+pub use oauth::{authorize, token, authorization_server_metadata, protected_resource_metadata};
 pub use mcp::{handle_mcp_sse, handle_mcp_sse_post};

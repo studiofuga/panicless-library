@@ -253,6 +253,64 @@ fn generate_token() -> String {
         .collect()
 }
 
+/// OAuth 2.0 Authorization Server Metadata (RFC 8414)
+/// /.well-known/oauth-authorization-server
+#[derive(Debug, Serialize)]
+pub struct AuthorizationServerMetadata {
+    pub issuer: String,
+    pub authorization_endpoint: String,
+    pub token_endpoint: String,
+    pub response_types_supported: Vec<String>,
+    pub grant_types_supported: Vec<String>,
+    pub token_endpoint_auth_methods_supported: Vec<String>,
+    pub service_documentation: Option<String>,
+    pub ui_locales_supported: Option<Vec<String>>,
+}
+
+/// OAuth 2.0 Protected Resource Metadata (RFC 8707)
+/// /.well-known/oauth-protected-resource
+#[derive(Debug, Serialize)]
+pub struct ProtectedResourceMetadata {
+    pub resource: String,
+    pub authorization_servers: Vec<String>,
+    pub bearer_methods_supported: Vec<String>,
+    pub resource_documentation: Option<String>,
+    pub resource_signing_alg_values_supported: Option<Vec<String>>,
+}
+
+/// Get OAuth 2.0 Authorization Server Metadata
+pub async fn authorization_server_metadata(
+    State(config): State<Config>,
+) -> Json<AuthorizationServerMetadata> {
+    let base_url = config.base_url();
+
+    Json(AuthorizationServerMetadata {
+        issuer: base_url.clone(),
+        authorization_endpoint: format!("{}/oauth/authorize", base_url),
+        token_endpoint: format!("{}/oauth/token", base_url),
+        response_types_supported: vec!["code".to_string()],
+        grant_types_supported: vec!["authorization_code".to_string()],
+        token_endpoint_auth_methods_supported: vec!["client_secret_post".to_string()],
+        service_documentation: Some("https://github.com/yourusername/panicless-library".to_string()),
+        ui_locales_supported: Some(vec!["en".to_string(), "it".to_string()]),
+    })
+}
+
+/// Get OAuth 2.0 Protected Resource Metadata
+pub async fn protected_resource_metadata(
+    State(config): State<Config>,
+) -> Json<ProtectedResourceMetadata> {
+    let base_url = config.base_url();
+
+    Json(ProtectedResourceMetadata {
+        resource: format!("{}/api", base_url),
+        authorization_servers: vec![base_url.clone()],
+        bearer_methods_supported: vec!["header".to_string()],
+        resource_documentation: Some("https://github.com/yourusername/panicless-library".to_string()),
+        resource_signing_alg_values_supported: Some(vec!["RS256".to_string(), "HS256".to_string()]),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

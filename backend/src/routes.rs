@@ -48,7 +48,10 @@ pub fn create_router(pool: DbPool, config: Config) -> Router {
         .route("/api/auth/login", post(handlers::login))
         .route("/api/auth/refresh", post(handlers::refresh))
         // OAuth2 token endpoint (no auth required, uses client credentials)
-        .route("/oauth/token", post(handlers::token));
+        .route("/oauth/token", post(handlers::token))
+        // OAuth2 Discovery endpoints (RFC 8414, RFC 8707)
+        .route("/.well-known/oauth-authorization-server", get(handlers::authorization_server_metadata))
+        .route("/.well-known/oauth-protected-resource", get(handlers::protected_resource_metadata));
 
     // Protected routes (authentication required)
     let protected_routes = Router::new()
