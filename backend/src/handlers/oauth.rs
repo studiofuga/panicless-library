@@ -8,6 +8,7 @@ use sqlx::{PgPool, Row};
 use chrono::Utc;
 use rand::Rng;
 use jsonwebtoken::{encode, EncodingKey, Header};
+use base64::{Engine as _, engine::general_purpose};
 
 use crate::{
     config::Config,
@@ -231,7 +232,7 @@ fn generate_code() -> String {
         .map(|_| rng.gen::<u8>())
         .collect();
 
-    base64::encode(&random_bytes)
+    general_purpose::STANDARD.encode(&random_bytes)
         .chars()
         .filter(|c| c.is_alphanumeric() || *c == '_' || *c == '-')
         .take(48)
@@ -245,7 +246,7 @@ fn generate_token() -> String {
         .map(|_| rng.gen::<u8>())
         .collect();
 
-    base64::encode(&random_bytes)
+    general_purpose::STANDARD.encode(&random_bytes)
         .chars()
         .filter(|c| c.is_alphanumeric() || *c == '_' || *c == '-')
         .take(96)
