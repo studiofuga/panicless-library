@@ -40,7 +40,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing::info!("Database connection test successful");
 
     // Create and run MCP server
-    let server = MCPServer::new(pool);
+    let server = MCPServer::new(pool, config.user_id);
+    tracing::info!("MCP Server ready for user_id: {}", config.user_id);
     tracing::info!("MCP Server ready to receive requests on stdin");
 
     server.run().await?;

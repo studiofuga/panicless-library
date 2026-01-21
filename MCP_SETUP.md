@@ -188,10 +188,18 @@ cd mcp-server
 # Build the mcp-server
 cargo build --release
 
-# Run with environment variables pointing to local database
+# Run with required environment variables
+# USER_ID: The ID of the user whose data to access (required)
+# DATABASE_URL: PostgreSQL connection string (required)
 DATABASE_URL="postgresql://postgres:postgres@localhost:5432/panicless" \
+USER_ID=1 \
 ./target/release/panicless-mcp-server
 ```
+
+Note: To find the user ID, you can:
+1. Check the database directly: `SELECT id, username FROM users;`
+2. Log in via the web UI and check the user ID from the backend response
+3. USER_ID must be set before running the mcp-server
 
 #### Step 2: Configure Claude Desktop for stdio
 
@@ -205,12 +213,17 @@ Edit your Claude Desktop configuration:
       "args": [],
       "env": {
         "DATABASE_URL": "postgresql://postgres:postgres@localhost:5432/panicless",
-        "JWT_SECRET": "your-jwt-secret"
+        "USER_ID": "1"
       }
     }
   }
 }
 ```
+
+Replace:
+- `/path/to/panicless-library` with the actual path to your mcp-server binary
+- `DATABASE_URL` with your PostgreSQL connection string
+- `USER_ID` with the ID of the user whose library to access
 
 #### Step 3: Restart Claude Desktop
 
@@ -256,6 +269,11 @@ All tools are user-scoped - they only return data for your authenticated user:
 - Verify MCP endpoint returns tools list: `curl http://localhost:8080/mcp`
 
 ### Standalone MCP Server Issues
+
+**Issue**: "USER_ID must be set" error
+- Set the USER_ID environment variable: `USER_ID=1 ./target/release/panicless-mcp-server`
+- Find user ID from database: `SELECT id, username FROM users;`
+- Or check Claude Desktop config has USER_ID in env
 
 **Issue**: "Command not found" when starting mcp-server
 - Verify the path to the binary is correct

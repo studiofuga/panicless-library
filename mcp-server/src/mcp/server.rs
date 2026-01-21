@@ -6,11 +6,12 @@ use panicless_mcp_lib::{protocol::*, tools};
 
 pub struct MCPServer {
     pool: PgPool,
+    user_id: i32,
 }
 
 impl MCPServer {
-    pub fn new(pool: PgPool) -> Self {
-        Self { pool }
+    pub fn new(pool: PgPool, user_id: i32) -> Self {
+        Self { pool, user_id }
     }
 
     pub async fn run(&self) -> Result<(), Box<dyn std::error::Error>> {
@@ -145,9 +146,8 @@ impl MCPServer {
             }
         };
 
-        // Note: user_id would need to come from somewhere (e.g., JWT claims in HTTP context)
-        // For backward compatibility with old stdio-based server, use user_id 0
-        match tools::execute_tool(&self.pool, &params.name, params.arguments, 0).await {
+        // Use the configured user_id from environment
+        match tools::execute_tool(&self.pool, &params.name, params.arguments, self.user_id).await {
             Ok(result) => {
                 serde_json::to_value(JsonRpcResponse::success(
                     id,
