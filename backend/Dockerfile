@@ -67,7 +67,7 @@ USER appuser
 EXPOSE 8080
 
 # Set environment variables (can be overridden)
-ENV RUST_LOG=info
+ENV RUST_LOG="info,panicless_backend=debug"
 ENV SERVER_HOST=0.0.0.0
 ENV SERVER_PORT=8080
 

@@ -113,8 +113,10 @@ async fn fallback_handler(uri: axum::http::Uri) -> impl IntoResponse {
     let path_without_query = path.split('?').next().unwrap_or(path);
 
     // Try to serve the static file
-    let file_path = format!("../frontend/dist/{}", path_without_query);
+    let file_path = format!("./frontend/dist/{}", path_without_query);
+    tracing::debug!("Fallback handler: trying to serve static file: {}", file_path);
     if let Ok(content) = tokio::fs::read(&file_path).await {
+        tracing::debug!("Fallback handler: successfully served static file: {}", file_path);
         // Get content type based on file extension
         let content_type = match std::path::Path::new(&file_path)
             .extension()
@@ -144,7 +146,9 @@ async fn fallback_handler(uri: axum::http::Uri) -> impl IntoResponse {
     }
 
     // If file not found, serve index.html for SPA routing
-    if let Ok(content) = tokio::fs::read_to_string("../frontend/dist/index.html").await {
+    tracing::debug!("Fallback handler: static file not found, trying index.html");
+    if let Ok(content) = tokio::fs::read_to_string("./frontend/dist/index.html").await {
+        tracing::debug!("Fallback handler: serving index.html for SPA routing");
         return (
             StatusCode::OK,
             [(axum::http::header::CONTENT_TYPE, "text/html; charset=utf-8")],
@@ -154,6 +158,7 @@ async fn fallback_handler(uri: axum::http::Uri) -> impl IntoResponse {
     }
 
     // Fallback to 404 if index.html doesn't exist
+    tracing::error!("Fallback handler: index.html not found at ./frontend/dist/index.html");
     (
         StatusCode::NOT_FOUND,
         "Not Found",
