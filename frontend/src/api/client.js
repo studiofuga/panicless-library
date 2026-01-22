@@ -20,9 +20,10 @@ export async function initializeApiClient() {
 // Request interceptor to add JWT token
 apiClient.interceptors.request.use(
   (config) => {
-    const authStore = useAuthStore()
-    if (authStore.accessToken) {
-      config.headers.Authorization = `Bearer ${authStore.accessToken}`
+    // Read token directly from localStorage to avoid issues with store initialization
+    const accessToken = localStorage.getItem('access_token')
+    if (accessToken) {
+      config.headers.Authorization = `Bearer ${accessToken}`
     }
     return config
   },
@@ -45,8 +46,11 @@ apiClient.interceptors.response.use(
         // Try to refresh the token
         await authStore.refreshToken()
 
-        // Retry the original request with new token
-        originalRequest.headers.Authorization = `Bearer ${authStore.accessToken}`
+        // Read the new token from localStorage (updated by authStore.refreshToken())
+        const newAccessToken = localStorage.getItem('access_token')
+        if (newAccessToken) {
+          originalRequest.headers.Authorization = `Bearer ${newAccessToken}`
+        }
         return apiClient(originalRequest)
       } catch (refreshError) {
         // Refresh failed, logout user
