@@ -136,20 +136,32 @@ Find books similar to book ID 3 for user 1
 
 ### 1. search_books
 
-Search books in user's library.
+Search books in user's library with pagination support.
 
 **Parameters**:
 - `user_id` (required): User ID
 - `query` (optional): Search term for title/author
 - `author` (optional): Filter by author
 - `year` (optional): Filter by publication year
+- `limit` (optional): Maximum number of results (default: 100, max: 500)
+- `offset` (optional): Number of results to skip for pagination (default: 0)
 
-**Example**:
+**Example - Basic search**:
 ```json
 {
   "user_id": 1,
   "query": "programming",
   "year": 2023
+}
+```
+
+**Example - With pagination**:
+```json
+{
+  "user_id": 1,
+  "query": "programming",
+  "limit": 50,
+  "offset": 100
 }
 ```
 
@@ -171,18 +183,30 @@ Get detailed information about a specific book including all reading records.
 
 ### 3. list_readings
 
-List reading records for a user.
+List reading records for a user with pagination support.
 
 **Parameters**:
 - `user_id` (required): User ID
-- `status` (optional): `"current"`, `"completed"`, or `"all"`
+- `status` (optional): `"current"`, `"completed"`, or `"all"` (default: all)
 - `year` (optional): Filter by year
+- `limit` (optional): Maximum number of results (default: 100, max: 500)
+- `offset` (optional): Number of results to skip for pagination (default: 0)
 
-**Example**:
+**Example - Basic listing**:
 ```json
 {
   "user_id": 1,
   "status": "current"
+}
+```
+
+**Example - With pagination**:
+```json
+{
+  "user_id": 1,
+  "status": "completed",
+  "limit": 25,
+  "offset": 50
 }
 ```
 
@@ -203,17 +227,29 @@ Get comprehensive reading statistics.
 
 ### 5. find_similar_books
 
-Find books by the same author.
+Find books by the same author with pagination support.
 
 **Parameters**:
 - `user_id` (required): User ID
 - `book_id` (required): Book ID to find similar books for
+- `limit` (optional): Maximum number of results (default: 50, max: 500)
+- `offset` (optional): Number of results to skip for pagination (default: 0)
 
-**Example**:
+**Example - Basic search**:
 ```json
 {
   "user_id": 1,
   "book_id": 3
+}
+```
+
+**Example - With pagination**:
+```json
+{
+  "user_id": 1,
+  "book_id": 3,
+  "limit": 20,
+  "offset": 40
 }
 ```
 

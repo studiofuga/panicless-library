@@ -164,14 +164,20 @@ Get current user information.
 All book endpoints require authentication (`Authorization: Bearer <access_token>`).
 
 #### GET `/api/books`
-List all books for the authenticated user.
+List all books for the authenticated user with pagination support.
 
 **Query Parameters**:
 - `search`: Search in title and author (optional)
 - `author`: Filter by author (optional)
 - `year`: Filter by publication year (optional)
-- `page`: Page number (default: 1)
-- `limit`: Items per page (default: 20)
+- `page`: Page number for pagination (default: 1, starting from 1)
+- `limit`: Items per page (default: 20, max: 100)
+
+**Pagination Notes**:
+- Uses page-based pagination: `offset = (page - 1) * limit`
+- Page numbering starts at 1
+- To get the next page, increment `page` parameter
+- Example: `GET /api/books?page=2&limit=20` returns items 21-40
 
 **Response** (200 OK):
 ```json
@@ -247,14 +253,20 @@ Get all reading records for a specific book.
 All reading endpoints require authentication.
 
 #### GET `/api/readings`
-List all readings for the authenticated user.
+List all readings for the authenticated user with pagination support.
 
 **Query Parameters**:
-- `status`: Filter by status (`current`, `completed`, `all`) (optional)
+- `status`: Filter by status (`current`, `completed`, `all`) (optional, default: all)
 - `book_id`: Filter by book ID (optional)
 - `year`: Filter by year (optional)
-- `page`: Page number (default: 1)
-- `limit`: Items per page (default: 20)
+- `page`: Page number for pagination (default: 1, starting from 1)
+- `limit`: Items per page (default: 20, max: 100)
+
+**Pagination Notes**:
+- Uses page-based pagination: `offset = (page - 1) * limit`
+- Page numbering starts at 1
+- To get the next page, increment `page` parameter
+- Example: `GET /api/readings?status=completed&page=1&limit=20` returns first 20 completed readings
 
 **Response** (200 OK):
 ```json

@@ -63,6 +63,8 @@ pub async fn search_books(
     query: Option<&str>,
     author: Option<&str>,
     year: Option<i32>,
+    limit: Option<i64>,
+    offset: Option<i64>,
 ) -> Result<Vec<Book>, sqlx::Error> {
     let mut sql = String::from("SELECT id, user_id, title, author, edition, isbn, publication_year, publisher, pages, language, description, cover_image_url, created_at, updated_at FROM books WHERE user_id = $1");
     let mut param_count = 2;
@@ -79,9 +81,14 @@ pub async fn search_books(
 
     if year.is_some() {
         sql.push_str(&format!(" AND publication_year = ${}", param_count));
+        param_count += 1;
     }
 
-    sql.push_str(" ORDER BY title LIMIT 100");
+    sql.push_str(" ORDER BY title");
+
+    let limit_val = limit.unwrap_or(100);
+    let offset_val = offset.unwrap_or(0);
+    sql.push_str(&format!(" LIMIT ${} OFFSET ${}", param_count, param_count + 1));
 
     let mut query_builder = sqlx::query_as::<_, Book>(&sql).bind(user_id);
 
@@ -98,6 +105,8 @@ pub async fn search_books(
     if let Some(y) = year {
         query_builder = query_builder.bind(y);
     }
+
+    query_builder = query_builder.bind(limit_val).bind(offset_val);
 
     query_builder.fetch_all(pool).await
 }
@@ -144,7 +153,8 @@ pub async fn list_readings(
     user_id: i32,
     status: Option<&str>,
     year: Option<i32>,
-    limit: Option<usize>
+    limit: Option<i64>,
+    offset: Option<i64>,
 ) -> Result<Vec<Reading>, sqlx::Error> {
     let mut sql = String::from(
         "SELECT r.id, r.user_id, r.book_id, r.start_date, r.end_date, r.rating, r.notes,
@@ -154,6 +164,8 @@ pub async fn list_readings(
          WHERE r.user_id = $1"
     );
 
+    let mut param_count = 2;
+
     match status {
         Some("current") => sql.push_str(" AND r.end_date IS NULL"),
         Some("completed") => sql.push_str(" AND r.end_date IS NOT NULL"),
@@ -161,20 +173,23 @@ pub async fn list_readings(
     }
 
     if year.is_some() {
-        sql.push_str(" AND (EXTRACT(YEAR FROM r.start_date) = $2 OR EXTRACT(YEAR FROM r.end_date) = $2)");
+        sql.push_str(&format!(" AND (EXTRACT(YEAR FROM r.start_date) = ${} OR EXTRACT(YEAR FROM r.end_date) = ${})", param_count, param_count));
+        param_count += 1;
     }
 
     sql.push_str(" ORDER BY r.start_date DESC");
 
-    if let Some(l) = limit {
-        sql.push_str(&format!(" LIMIT {}", l));
-    }
+    let limit_val = limit.unwrap_or(100);
+    let offset_val = offset.unwrap_or(0);
+    sql.push_str(&format!(" LIMIT ${} OFFSET ${}", param_count, param_count + 1));
 
     let mut query_builder = sqlx::query_as::<_, Reading>(&sql).bind(user_id);
 
     if let Some(y) = year {
         query_builder = query_builder.bind(y);
     }
+
+    query_builder = query_builder.bind(limit_val).bind(offset_val);
 
     query_builder.fetch_all(pool).await
 }
@@ -242,16 +257,23 @@ pub async fn find_similar_books(
     pool: &PgPool,
     user_id: i32,
     book_id: i32,
+    limit: Option<i64>,
+    offset: Option<i64>,
 ) -> Result<Vec<Book>, sqlx::Error> {
+    let limit_val = limit.unwrap_or(50);
+    let offset_val = offset.unwrap_or(0);
+
     sqlx::query_as::<_, Book>(
         "SELECT b2.id, b2.user_id, b2.title, b2.author, b2.edition, b2.isbn, b2.publication_year, b2.publisher, b2.pages, b2.language, b2.description, b2.cover_image_url, b2.created_at, b2.updated_at FROM books b1
          JOIN books b2 ON b1.author = b2.author AND b1.id != b2.id
          WHERE b1.id = $1 AND b1.user_id = $2 AND b2.user_id = $2
          ORDER BY b2.title
-         LIMIT 20"
+         LIMIT $3 OFFSET $4"
     )
     .bind(book_id)
     .bind(user_id)
+    .bind(limit_val)
+    .bind(offset_val)
     .fetch_all(pool)
     .await
 }

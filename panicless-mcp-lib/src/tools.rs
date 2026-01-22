@@ -8,7 +8,7 @@ pub fn get_tool_definitions() -> Vec<ToolDefinition> {
     vec![
         ToolDefinition {
             name: "search_books".to_string(),
-            description: "Search books in user's library by title, author, or year".to_string(),
+            description: "Search books in user's library by title, author, or year with pagination support".to_string(),
             input_schema: json!({
                 "type": "object",
                 "properties": {
@@ -26,7 +26,14 @@ pub fn get_tool_definitions() -> Vec<ToolDefinition> {
                     },
                     "limit": {
                         "type": "integer",
-                        "description": "Maximum number of results to return (optional)"
+                        "description": "Maximum number of results to return (default: 100, max: 500)",
+                        "minimum": 1,
+                        "maximum": 500
+                    },
+                    "offset": {
+                        "type": "integer",
+                        "description": "Number of results to skip for pagination (default: 0)",
+                        "minimum": 0
                     }
                 },
                 "required": []
@@ -48,7 +55,7 @@ pub fn get_tool_definitions() -> Vec<ToolDefinition> {
         },
         ToolDefinition {
             name: "list_readings".to_string(),
-            description: "List reading records for a user, optionally filtered by status or year".to_string(),
+            description: "List reading records for a user, optionally filtered by status or year, with pagination support".to_string(),
             input_schema: json!({
                 "type": "object",
                 "properties": {
@@ -60,6 +67,17 @@ pub fn get_tool_definitions() -> Vec<ToolDefinition> {
                     "year": {
                         "type": "integer",
                         "description": "Filter by year (optional)"
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Maximum number of results to return (default: 100, max: 500)",
+                        "minimum": 1,
+                        "maximum": 500
+                    },
+                    "offset": {
+                        "type": "integer",
+                        "description": "Number of results to skip for pagination (default: 0)",
+                        "minimum": 0
                     }
                 },
                 "required": []
@@ -81,13 +99,24 @@ pub fn get_tool_definitions() -> Vec<ToolDefinition> {
         },
         ToolDefinition {
             name: "find_similar_books".to_string(),
-            description: "Find books by the same author or with similar attributes".to_string(),
+            description: "Find books by the same author or with similar attributes, with pagination support".to_string(),
             input_schema: json!({
                 "type": "object",
                 "properties": {
                     "book_id": {
                         "type": "integer",
-                        "description": "Book ID to find similar books for"
+                        "description": "Book ID to find similar books for (required)"
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Maximum number of results to return (default: 50, max: 500)",
+                        "minimum": 1,
+                        "maximum": 500
+                    },
+                    "offset": {
+                        "type": "integer",
+                        "description": "Number of results to skip for pagination (default: 0)",
+                        "minimum": 0
                     }
                 },
                 "required": ["book_id"]
@@ -207,8 +236,10 @@ async fn search_books(pool: &PgPool, args: Value, user_id: i32) -> Result<ToolCa
     let query = args["query"].as_str();
     let author = args["author"].as_str();
     let year = args["year"].as_i64().map(|y| y as i32);
+    let limit = args["limit"].as_i64();
+    let offset = args["offset"].as_i64();
 
-    let books = queries::search_books(pool, user_id, query, author, year)
+    let books = queries::search_books(pool, user_id, query, author, year, limit, offset)
         .await
         .map_err(|e| e.to_string())?;
 
@@ -268,9 +299,10 @@ async fn get_book_details(pool: &PgPool, args: Value, user_id: i32) -> Result<To
 async fn list_readings(pool: &PgPool, args: Value, user_id: i32) -> Result<ToolCallResult, String> {
     let status = args["status"].as_str();
     let year = args["year"].as_i64().map(|y| y as i32);
-    let limit = args["limit"].as_i64().map(|l| l as usize);
+    let limit = args["limit"].as_i64();
+    let offset = args["offset"].as_i64();
 
-    let readings = queries::list_readings(pool, user_id, status, year, limit)
+    let readings = queries::list_readings(pool, user_id, status, year, limit, offset)
         .await
         .map_err(|e| e.to_string())?;
 
@@ -330,8 +362,10 @@ async fn get_reading_statistics(pool: &PgPool, _args: Value, user_id: i32) -> Re
 
 async fn find_similar_books(pool: &PgPool, args: Value, user_id: i32) -> Result<ToolCallResult, String> {
     let book_id = args["book_id"].as_i64().ok_or("book_id is required")? as i32;
+    let limit = args["limit"].as_i64();
+    let offset = args["offset"].as_i64();
 
-    let similar = queries::find_similar_books(pool, user_id, book_id)
+    let similar = queries::find_similar_books(pool, user_id, book_id, limit, offset)
         .await
         .map_err(|e| e.to_string())?;
 
