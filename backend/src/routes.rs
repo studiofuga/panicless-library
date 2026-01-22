@@ -6,7 +6,12 @@ use axum::{
     Router,
     http::StatusCode,
 };
-use tower_http::cors::CorsLayer;
+use tower_http::{
+    cors::CorsLayer,
+    trace::{TraceLayer, DefaultMakeSpan, DefaultOnResponse},
+};
+use tower_http::LatencyUnit;
+use tracing::Level;
 
 use crate::{
     config::Config,
@@ -100,12 +105,23 @@ pub fn create_router(pool: DbPool, config: Config) -> Router {
         .route("/health", get(|| async { "OK" }))
         .route("/openapi.json", get(handlers::openapi_schema));
 
+    // Create trace layer for request/response logging
+    let trace_layer = TraceLayer::new_for_http()
+        .make_span_with(DefaultMakeSpan::new()
+            .level(Level::INFO)
+            .include_headers(true))
+        .on_response(DefaultOnResponse::new()
+            .level(Level::INFO)
+            .latency_unit(LatencyUnit::Millis)
+            .include_headers(true));
+
     // Combine all routes
     Router::new()
         .merge(public_routes)
         .merge(protected_routes)
         .merge(public_metadata_routes)
         .fallback(fallback_handler)
+        .layer(trace_layer)
         .layer(cors)
         .with_state(state)
 }

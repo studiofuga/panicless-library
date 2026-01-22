@@ -57,13 +57,32 @@ pub async fn authorize(
     claims: Claims,
     Query(params): Query<AuthorizeRequest>,
 ) -> Result<Json<AuthorizeResponse>, AppError> {
+    tracing::info!(
+        "OAuth authorize request: user_id={}, client_id={}, redirect_uri={}, response_type={}, scope={:?}, state={:?}",
+        claims.sub,
+        params.client_id,
+        params.redirect_uri,
+        params.response_type,
+        params.scope,
+        params.state
+    );
+
     // Verify client_id
     if params.client_id != config.oauth_client_id {
+        tracing::error!(
+            "OAuth authorize failed: Invalid client_id. Expected: {}, Got: {}",
+            config.oauth_client_id,
+            params.client_id
+        );
         return Err(AppError::Authentication("Invalid client_id".to_string()));
     }
 
     // Validate response_type is "code"
     if params.response_type != "code" {
+        tracing::error!(
+            "OAuth authorize failed: Invalid response_type. Got: {}",
+            params.response_type
+        );
         return Err(AppError::Validation(
             "Only response_type=code is supported".to_string(),
         ));
@@ -106,14 +125,27 @@ pub async fn token(
     State(config): State<Config>,
     Json(payload): Json<TokenRequest>,
 ) -> Result<(StatusCode, Json<TokenResponse>), AppError> {
+    tracing::info!(
+        "OAuth token request: client_id={}, grant_type={}, redirect_uri={}, code_length={}",
+        payload.client_id,
+        payload.grant_type,
+        payload.redirect_uri,
+        payload.code.len()
+    );
+
     // Verify client credentials
     if payload.client_id != config.oauth_client_id || payload.client_secret != config.oauth_client_secret {
-        tracing::warn!("Invalid OAuth client credentials attempt");
+        tracing::error!(
+            "OAuth token failed: Invalid client credentials. client_id={}, secret_match={}",
+            payload.client_id,
+            payload.client_secret == config.oauth_client_secret
+        );
         return Err(AppError::Authentication("Invalid client credentials".to_string()));
     }
 
     // Verify grant_type
     if payload.grant_type != "authorization_code" {
+        tracing::error!("OAuth token failed: Invalid grant_type. Got: {}", payload.grant_type);
         return Err(AppError::Validation(
             "Only grant_type=authorization_code is supported".to_string(),
         ));
@@ -127,7 +159,14 @@ pub async fn token(
     .bind(&payload.client_id)
     .fetch_optional(&pool)
     .await?
-    .ok_or_else(|| AppError::Authentication("Authorization code not found".to_string()))?;
+    .ok_or_else(|| {
+        tracing::error!(
+            "OAuth token failed: Authorization code not found. code={}, client_id={}",
+            payload.code,
+            payload.client_id
+        );
+        AppError::Authentication("Authorization code not found".to_string())
+    })?;
 
     let code_id: i32 = oauth_code.get("id");
     let user_id: i32 = oauth_code.get("user_id");
@@ -136,19 +175,37 @@ pub async fn token(
     let expires_at: chrono::DateTime<Utc> = oauth_code.get("expires_at");
     let used_at: Option<chrono::DateTime<Utc>> = oauth_code.get("used_at");
 
+    tracing::info!(
+        "OAuth code found: code_id={}, user_id={}, expires_at={}, used_at={:?}",
+        code_id,
+        user_id,
+        expires_at,
+        used_at
+    );
+
     // Check if code has expired
     if expires_at < Utc::now() {
+        tracing::error!(
+            "OAuth token failed: Authorization code expired. expires_at={}, now={}",
+            expires_at,
+            Utc::now()
+        );
         return Err(AppError::Validation("Authorization code expired".to_string()));
     }
 
     // Check if code was already used
     if used_at.is_some() {
-        tracing::warn!("Attempt to reuse authorization code");
+        tracing::error!("OAuth token failed: Authorization code already used. code_id={}", code_id);
         return Err(AppError::Authentication("Authorization code already used".to_string()));
     }
 
     // Check redirect_uri matches
     if redirect_uri != payload.redirect_uri {
+        tracing::error!(
+            "OAuth token failed: Redirect URI mismatch. Expected: {}, Got: {}",
+            redirect_uri,
+            payload.redirect_uri
+        );
         return Err(AppError::Validation("Redirect URI mismatch".to_string()));
     }
 
