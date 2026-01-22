@@ -6,8 +6,10 @@ use axum::{
 };
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
+use sqlx::{PgPool, Row};
+use chrono::Utc;
 
-use crate::{config::Config, errors::{AppError, AppResult}};
+use crate::{config::Config, errors::{AppError, AppResult}, db::DbPool};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Claims {
@@ -61,6 +63,7 @@ pub fn verify_jwt(token: &str, secret: &str) -> AppResult<Claims> {
 }
 
 pub async fn auth_middleware(
+    State(pool): State<DbPool>,
     State(config): State<Config>,
     mut request: Request,
     next: Next,
@@ -79,18 +82,77 @@ pub async fn auth_middleware(
 
     let token = auth_header.trim_start_matches("Bearer ");
 
-    let claims = verify_jwt(token, &config.jwt_secret)?;
+    // Try to validate as JWT first (for regular user authentication)
+    let claims = match verify_jwt(token, &config.jwt_secret) {
+        Ok(jwt_claims) => {
+            // Valid JWT token
+            if jwt_claims.token_type != "access" {
+                return Err(AppError::Authentication("Invalid token type".to_string()));
+            }
+            tracing::debug!("Authenticated with JWT token for user_id={}", jwt_claims.sub);
+            jwt_claims
+        }
+        Err(_) => {
+            // Not a valid JWT, try OAuth access token
+            tracing::debug!("Token is not a valid JWT, checking OAuth access tokens");
 
-    if claims.token_type != "access" {
-        return Err(AppError::Authentication(
-            "Invalid token type".to_string(),
-        ));
-    }
+            match verify_oauth_token(&pool, token).await {
+                Ok(oauth_claims) => {
+                    tracing::info!("Authenticated with OAuth access token for user_id={}", oauth_claims.sub);
+                    oauth_claims
+                }
+                Err(e) => {
+                    tracing::error!("Authentication failed: not a valid JWT or OAuth token: {}", e);
+                    return Err(AppError::Authentication("Invalid token".to_string()));
+                }
+            }
+        }
+    };
 
     // Insert claims into request extensions so handlers can access them
     request.extensions_mut().insert(claims);
 
     Ok(next.run(request).await)
+}
+
+/// Verify OAuth access token by looking it up in the database
+async fn verify_oauth_token(pool: &PgPool, token: &str) -> AppResult<Claims> {
+    // Look up token in database
+    let row = sqlx::query(
+        "SELECT user_id, expires_at FROM oauth_tokens WHERE token = $1"
+    )
+    .bind(token)
+    .fetch_optional(pool)
+    .await?
+    .ok_or_else(|| AppError::Authentication("OAuth token not found".to_string()))?;
+
+    let user_id: i32 = row.get("user_id");
+    let expires_at: chrono::DateTime<Utc> = row.get("expires_at");
+
+    // Check if token has expired
+    if expires_at < Utc::now() {
+        return Err(AppError::Authentication("OAuth token expired".to_string()));
+    }
+
+    // Get user info
+    let user = sqlx::query("SELECT username FROM users WHERE id = $1")
+        .bind(user_id)
+        .fetch_one(pool)
+        .await?;
+
+    let username: String = user.get("username");
+
+    // Create claims from OAuth token
+    let exp = expires_at.timestamp() as usize;
+    let now = Utc::now().timestamp() as usize;
+
+    Ok(Claims {
+        sub: user_id,
+        username,
+        exp,
+        iat: now,
+        token_type: "access".to_string(),
+    })
 }
 
 // Custom extractor for Claims that works with FromRequestParts

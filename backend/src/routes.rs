@@ -96,7 +96,7 @@ pub fn create_router(pool: DbPool, config: Config) -> Router {
         .route("/mcp", post(handlers::handle_mcp_sse_post))
         // Apply authentication middleware to all protected routes
         .layer(middleware::from_fn_with_state(
-            config.clone(),
+            state.clone(),
             auth_middleware,
         ));
 
