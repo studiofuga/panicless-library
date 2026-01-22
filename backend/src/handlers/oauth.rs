@@ -1,5 +1,5 @@
 use axum::{
-    extract::{Query, State},
+    extract::{Query, State, Form},
     http::StatusCode,
     Json,
 };
@@ -120,10 +120,11 @@ pub async fn authorize(
 
 /// OAuth2 Token endpoint
 /// Exchanges authorization code for access token
+/// Accepts both application/json and application/x-www-form-urlencoded (RFC 6749)
 pub async fn token(
     State(pool): State<PgPool>,
     State(config): State<Config>,
-    Json(payload): Json<TokenRequest>,
+    Form(payload): Form<TokenRequest>,
 ) -> Result<(StatusCode, Json<TokenResponse>), AppError> {
     tracing::info!(
         "OAuth token request: client_id={}, grant_type={}, redirect_uri={}, code_length={}",
