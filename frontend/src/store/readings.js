@@ -7,13 +7,28 @@ export const useReadingsStore = defineStore('readings', () => {
   const stats = ref(null)
   const loading = ref(false)
   const error = ref(null)
+  const currentPage = ref(1)
+  const pageSize = ref(20)
+  const totalReadings = ref(0)
 
   async function fetchReadings(params = {}) {
     loading.value = true
     error.value = null
     try {
-      const response = await apiClient.get('/api/readings', { params })
+      // Include pagination parameters
+      const requestParams = {
+        page: currentPage.value,
+        limit: pageSize.value,
+        ...params
+      }
+      const response = await apiClient.get('/api/readings', { params: requestParams })
       readings.value = response.data
+
+      // Calculate total if we have less items than pageSize, it's the last page
+      if (response.data.length < pageSize.value) {
+        totalReadings.value = (currentPage.value - 1) * pageSize.value + response.data.length
+      }
+
       return response.data
     } catch (err) {
       error.value = err.response?.data?.message || 'Failed to fetch readings'
@@ -21,6 +36,15 @@ export const useReadingsStore = defineStore('readings', () => {
     } finally {
       loading.value = false
     }
+  }
+
+  function setCurrentPage(page) {
+    currentPage.value = page
+  }
+
+  function setPageSize(size) {
+    pageSize.value = size
+    currentPage.value = 1 // Reset to first page when changing page size
   }
 
   async function createReading(readingData) {
@@ -104,11 +128,16 @@ export const useReadingsStore = defineStore('readings', () => {
     stats,
     loading,
     error,
+    currentPage,
+    pageSize,
+    totalReadings,
     fetchReadings,
     createReading,
     updateReading,
     completeReading,
     deleteReading,
-    fetchStats
+    fetchStats,
+    setCurrentPage,
+    setPageSize
   }
 })

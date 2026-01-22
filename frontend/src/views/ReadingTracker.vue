@@ -17,56 +17,69 @@
     <!-- Readings List -->
     <n-spin :show="loading">
       <n-empty v-if="readings.length === 0 && !loading" description="No readings found. Start reading a book!" />
-      <n-list v-else bordered>
-        <n-list-item v-for="reading in readings" :key="reading.id">
-          <n-thing>
-            <template #header>
-              {{ reading.book_title }}
-            </template>
-            <template #description>
-              <n-space vertical size="small">
-                <div>by {{ reading.book_author || 'Unknown' }}</div>
-                <div>
-                  <strong>Started:</strong> {{ formatDate(reading.start_date) }}
-                  <span v-if="reading.end_date">
-                    | <strong>Finished:</strong> {{ formatDate(reading.end_date) }}
-                  </span>
-                  <n-tag v-else type="info" size="small" style="margin-left: 8px;">
-                    Currently Reading
-                  </n-tag>
-                </div>
-                <div v-if="reading.rating">
-                  <strong>Rating:</strong>
-                  <n-rate :value="reading.rating" readonly size="small" />
-                </div>
-                <div v-if="reading.notes">
-                  <strong>Notes:</strong> {{ reading.notes }}
-                </div>
-              </n-space>
-            </template>
-            <template #footer>
-              <n-space>
-                <n-button
-                  v-if="!reading.end_date"
-                  size="small"
-                  type="primary"
-                  @click="handleCompleteReading(reading)"
-                >
-                  Mark as Completed
-                </n-button>
-                <n-button
-                  size="small"
-                  type="error"
-                  ghost
-                  @click="handleDeleteReading(reading.id)"
-                >
-                  Delete
-                </n-button>
-              </n-space>
-            </template>
-          </n-thing>
-        </n-list-item>
-      </n-list>
+      <div v-else>
+        <n-list bordered>
+          <n-list-item v-for="reading in readings" :key="reading.id">
+            <n-thing>
+              <template #header>
+                {{ reading.book_title }}
+              </template>
+              <template #description>
+                <n-space vertical size="small">
+                  <div>by {{ reading.book_author || 'Unknown' }}</div>
+                  <div>
+                    <strong>Started:</strong> {{ formatDate(reading.start_date) }}
+                    <span v-if="reading.end_date">
+                      | <strong>Finished:</strong> {{ formatDate(reading.end_date) }}
+                    </span>
+                    <n-tag v-else type="info" size="small" style="margin-left: 8px;">
+                      Currently Reading
+                    </n-tag>
+                  </div>
+                  <div v-if="reading.rating">
+                    <strong>Rating:</strong>
+                    <n-rate :value="reading.rating" readonly size="small" />
+                  </div>
+                  <div v-if="reading.notes">
+                    <strong>Notes:</strong> {{ reading.notes }}
+                  </div>
+                </n-space>
+              </template>
+              <template #footer>
+                <n-space>
+                  <n-button
+                    v-if="!reading.end_date"
+                    size="small"
+                    type="primary"
+                    @click="handleCompleteReading(reading)"
+                  >
+                    Mark as Completed
+                  </n-button>
+                  <n-button
+                    size="small"
+                    type="error"
+                    ghost
+                    @click="handleDeleteReading(reading.id)"
+                  >
+                    Delete
+                  </n-button>
+                </n-space>
+              </template>
+            </n-thing>
+          </n-list-item>
+        </n-list>
+
+        <!-- Pagination -->
+        <n-space justify="center" style="margin-top: 24px;">
+          <n-pagination
+            :page="readingsStore.currentPage"
+            :page-size="readingsStore.pageSize"
+            :item-count="totalItems"
+            :on-update:page="handlePageChange"
+            @update:page-size="handlePageSizeChange"
+          />
+        </n-space>
+      </div>
     </n-spin>
 
     <!-- Complete Reading Modal -->
@@ -122,7 +135,8 @@ import {
   NCard,
   NForm,
   NFormItem,
-  NDatePicker
+  NDatePicker,
+  NPagination
 } from 'naive-ui'
 
 const readingsStore = useReadingsStore()
@@ -131,6 +145,15 @@ const dialog = useDialog()
 
 const readings = computed(() => readingsStore.readings)
 const loading = computed(() => readingsStore.loading)
+const totalItems = computed(() => {
+  // If we're on the last page and got less items than pageSize, we can calculate exact total
+  // Otherwise, we estimate based on full pages
+  if (readings.value.length < readingsStore.pageSize) {
+    return (readingsStore.currentPage - 1) * readingsStore.pageSize + readings.value.length
+  }
+  // For estimation: assume there's at least one more page
+  return (readingsStore.currentPage + 1) * readingsStore.pageSize
+})
 
 const statusFilter = ref('all')
 const statusOptions = [
@@ -138,6 +161,7 @@ const statusOptions = [
   { label: 'Currently Reading', value: 'current' },
   { label: 'Completed', value: 'completed' }
 ]
+const currentStatusFilter = ref('all')
 
 const showCompleteModal = ref(false)
 const selectedReading = ref(null)
@@ -156,10 +180,32 @@ onMounted(async () => {
 
 const handleFilterChange = async () => {
   try {
+    currentStatusFilter.value = statusFilter.value
+    readingsStore.setCurrentPage(1) // Reset to first page on filter change
     const params = statusFilter.value === 'all' ? {} : { status: statusFilter.value }
     await readingsStore.fetchReadings(params)
   } catch (error) {
     message.error('Failed to filter readings')
+  }
+}
+
+const handlePageChange = async (page) => {
+  try {
+    readingsStore.setCurrentPage(page)
+    const params = currentStatusFilter.value === 'all' ? {} : { status: currentStatusFilter.value }
+    await readingsStore.fetchReadings(params)
+  } catch (error) {
+    message.error('Failed to load page')
+  }
+}
+
+const handlePageSizeChange = async (pageSize) => {
+  try {
+    readingsStore.setPageSize(pageSize)
+    const params = currentStatusFilter.value === 'all' ? {} : { status: currentStatusFilter.value }
+    await readingsStore.fetchReadings(params)
+  } catch (error) {
+    message.error('Failed to change page size')
   }
 }
 
@@ -186,7 +232,9 @@ const handleSaveComplete = async () => {
     })
     message.success('Reading completed!')
     showCompleteModal.value = false
-    await readingsStore.fetchReadings({ status: statusFilter.value === 'all' ? undefined : statusFilter.value })
+    readingsStore.setCurrentPage(1) // Reset to first page
+    const params = statusFilter.value === 'all' ? {} : { status: statusFilter.value }
+    await readingsStore.fetchReadings(params)
   } catch (error) {
     message.error('Failed to complete reading')
   }
@@ -202,6 +250,9 @@ const handleDeleteReading = (id) => {
       try {
         await readingsStore.deleteReading(id)
         message.success('Reading deleted')
+        // Reload readings to reflect the deletion
+        const params = statusFilter.value === 'all' ? {} : { status: statusFilter.value }
+        await readingsStore.fetchReadings(params)
       } catch (error) {
         message.error('Failed to delete reading')
       }

@@ -7,13 +7,28 @@ export const useBooksStore = defineStore('books', () => {
   const currentBook = ref(null)
   const loading = ref(false)
   const error = ref(null)
+  const currentPage = ref(1)
+  const pageSize = ref(20)
+  const totalBooks = ref(0)
 
   async function fetchBooks(params = {}) {
     loading.value = true
     error.value = null
     try {
-      const response = await apiClient.get('/api/books', { params })
+      // Include pagination parameters
+      const requestParams = {
+        page: currentPage.value,
+        limit: pageSize.value,
+        ...params
+      }
+      const response = await apiClient.get('/api/books', { params: requestParams })
       books.value = response.data
+
+      // Calculate total if we have less items than pageSize, it's the last page
+      if (response.data.length < pageSize.value) {
+        totalBooks.value = (currentPage.value - 1) * pageSize.value + response.data.length
+      }
+
       return response.data
     } catch (err) {
       error.value = err.response?.data?.message || 'Failed to fetch books'
@@ -21,6 +36,15 @@ export const useBooksStore = defineStore('books', () => {
     } finally {
       loading.value = false
     }
+  }
+
+  function setCurrentPage(page) {
+    currentPage.value = page
+  }
+
+  function setPageSize(size) {
+    pageSize.value = size
+    currentPage.value = 1 // Reset to first page when changing page size
   }
 
   async function fetchBook(id) {
@@ -111,11 +135,16 @@ export const useBooksStore = defineStore('books', () => {
     currentBook,
     loading,
     error,
+    currentPage,
+    pageSize,
+    totalBooks,
     fetchBooks,
     fetchBook,
     createBook,
     updateBook,
     deleteBook,
-    importGoodreadsCSV
+    importGoodreadsCSV,
+    setCurrentPage,
+    setPageSize
   }
 })

@@ -20,25 +20,38 @@
     <!-- Books List -->
     <n-spin :show="loading">
       <n-empty v-if="books.length === 0 && !loading" description="No books found. Add your first book!" />
-      <n-list v-else hoverable clickable>
-        <n-list-item v-for="book in books" :key="book.id" @click="$router.push(`/books/${book.id}`)">
-          <n-thing>
-            <template #header>
-              {{ book.title }}
-            </template>
-            <template #description>
-              {{ book.author || 'Unknown Author' }}
-              <span v-if="book.publication_year"> ({{ book.publication_year }})</span>
-            </template>
-            <template #footer>
-              <n-space size="small">
-                <n-tag v-if="book.isbn" size="small">ISBN: {{ book.isbn }}</n-tag>
-                <n-tag v-if="book.publisher" size="small">{{ book.publisher }}</n-tag>
-              </n-space>
-            </template>
-          </n-thing>
-        </n-list-item>
-      </n-list>
+      <div v-else>
+        <n-list hoverable clickable>
+          <n-list-item v-for="book in books" :key="book.id" @click="$router.push(`/books/${book.id}`)">
+            <n-thing>
+              <template #header>
+                {{ book.title }}
+              </template>
+              <template #description>
+                {{ book.author || 'Unknown Author' }}
+                <span v-if="book.publication_year"> ({{ book.publication_year }})</span>
+              </template>
+              <template #footer>
+                <n-space size="small">
+                  <n-tag v-if="book.isbn" size="small">ISBN: {{ book.isbn }}</n-tag>
+                  <n-tag v-if="book.publisher" size="small">{{ book.publisher }}</n-tag>
+                </n-space>
+              </template>
+            </n-thing>
+          </n-list-item>
+        </n-list>
+
+        <!-- Pagination -->
+        <n-space justify="center" style="margin-top: 24px;">
+          <n-pagination
+            :page="booksStore.currentPage"
+            :page-size="booksStore.pageSize"
+            :item-count="totalItems"
+            :on-update:page="handlePageChange"
+            @update:page-size="handlePageSizeChange"
+          />
+        </n-space>
+      </div>
     </n-spin>
 
     <!-- Add Book Modal -->
@@ -121,7 +134,8 @@ import {
   NFormItem,
   NInputNumber,
   NGrid,
-  NGridItem
+  NGridItem,
+  NPagination
 } from 'naive-ui'
 
 const booksStore = useBooksStore()
@@ -129,10 +143,20 @@ const message = useMessage()
 
 const books = computed(() => booksStore.books)
 const loading = computed(() => booksStore.loading)
+const totalItems = computed(() => {
+  // If we're on the last page and got less items than pageSize, we can calculate exact total
+  // Otherwise, we estimate based on full pages
+  if (books.value.length < booksStore.pageSize) {
+    return (booksStore.currentPage - 1) * booksStore.pageSize + books.value.length
+  }
+  // For estimation: assume there's at least one more page
+  return (booksStore.currentPage + 1) * booksStore.pageSize
+})
 
 const showAddModal = ref(false)
 const saving = ref(false)
 const searchQuery = ref('')
+const currentSearchQuery = ref('')
 const formRef = ref(null)
 const formValue = ref({
   title: '',
@@ -155,9 +179,31 @@ onMounted(async () => {
 
 const handleSearch = async () => {
   try {
+    currentSearchQuery.value = searchQuery.value
+    booksStore.setCurrentPage(1) // Reset to first page on new search
     await booksStore.fetchBooks({ search: searchQuery.value })
   } catch (error) {
     message.error('Search failed')
+  }
+}
+
+const handlePageChange = async (page) => {
+  try {
+    booksStore.setCurrentPage(page)
+    const params = currentSearchQuery.value ? { search: currentSearchQuery.value } : {}
+    await booksStore.fetchBooks(params)
+  } catch (error) {
+    message.error('Failed to load page')
+  }
+}
+
+const handlePageSizeChange = async (pageSize) => {
+  try {
+    booksStore.setPageSize(pageSize)
+    const params = currentSearchQuery.value ? { search: currentSearchQuery.value } : {}
+    await booksStore.fetchBooks(params)
+  } catch (error) {
+    message.error('Failed to change page size')
   }
 }
 
@@ -190,6 +236,12 @@ const handleAddBook = async () => {
       language: '',
       description: ''
     }
+
+    // Reload books list (reset to first page and clear search)
+    searchQuery.value = ''
+    currentSearchQuery.value = ''
+    booksStore.setCurrentPage(1)
+    await booksStore.fetchBooks()
   } catch (error) {
     message.error('Failed to add book')
   } finally {
