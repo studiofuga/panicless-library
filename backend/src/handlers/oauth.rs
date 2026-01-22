@@ -34,10 +34,11 @@ pub struct AuthorizeResponse {
 #[derive(Debug, Deserialize)]
 pub struct TokenRequest {
     pub client_id: String,
-    pub client_secret: String,
+    pub client_secret: Option<String>, // May be in Authorization header instead
     pub code: String,
     pub grant_type: String, // "authorization_code"
     pub redirect_uri: String,
+    pub code_verifier: Option<String>, // PKCE parameter (RFC 7636)
 }
 
 #[derive(Debug, Serialize)]
@@ -121,25 +122,68 @@ pub async fn authorize(
 /// OAuth2 Token endpoint
 /// Exchanges authorization code for access token
 /// Accepts both application/json and application/x-www-form-urlencoded (RFC 6749)
+/// Supports client_secret_post and client_secret_basic authentication methods
 pub async fn token(
     State(pool): State<PgPool>,
     State(config): State<Config>,
+    headers: axum::http::HeaderMap,
     Form(payload): Form<TokenRequest>,
 ) -> Result<(StatusCode, Json<TokenResponse>), AppError> {
     tracing::info!(
-        "OAuth token request: client_id={}, grant_type={}, redirect_uri={}, code_length={}",
+        "OAuth token request: client_id={}, grant_type={}, redirect_uri={}, code_length={}, code_verifier={:?}, client_secret_in_body={}",
         payload.client_id,
         payload.grant_type,
         payload.redirect_uri,
-        payload.code.len()
+        payload.code.len(),
+        payload.code_verifier.as_ref().map(|v| &v[..v.len().min(10)]),
+        payload.client_secret.is_some()
     );
 
+    // Extract client_secret from form body or Authorization header
+    let client_secret = if let Some(secret) = &payload.client_secret {
+        secret.clone()
+    } else if let Some(auth_header) = headers.get(axum::http::header::AUTHORIZATION) {
+        // Try to extract from Basic auth
+        if let Ok(auth_str) = auth_header.to_str() {
+            if auth_str.starts_with("Basic ") {
+                let encoded = &auth_str[6..];
+                if let Ok(decoded_bytes) = general_purpose::STANDARD.decode(encoded) {
+                    if let Ok(decoded) = String::from_utf8(decoded_bytes) {
+                        // Format is "client_id:client_secret"
+                        if let Some((_id, secret)) = decoded.split_once(':') {
+                            tracing::info!("Using client_secret from Basic Authorization header");
+                            secret.to_string()
+                        } else {
+                            tracing::error!("Invalid Basic auth format");
+                            return Err(AppError::Authentication("Invalid Authorization header format".to_string()));
+                        }
+                    } else {
+                        tracing::error!("Basic auth not valid UTF-8");
+                        return Err(AppError::Authentication("Invalid Authorization header encoding".to_string()));
+                    }
+                } else {
+                    tracing::error!("Failed to decode Basic auth");
+                    return Err(AppError::Authentication("Invalid Authorization header".to_string()));
+                }
+            } else {
+                tracing::error!("Authorization header not Basic auth");
+                return Err(AppError::Authentication("Only Basic authorization supported".to_string()));
+            }
+        } else {
+            tracing::error!("Authorization header not valid string");
+            return Err(AppError::Authentication("Invalid Authorization header".to_string()));
+        }
+    } else {
+        tracing::error!("No client_secret in form body or Authorization header");
+        return Err(AppError::Authentication("Missing client credentials".to_string()));
+    };
+
     // Verify client credentials
-    if payload.client_id != config.oauth_client_id || payload.client_secret != config.oauth_client_secret {
+    if payload.client_id != config.oauth_client_id || client_secret != config.oauth_client_secret {
         tracing::error!(
             "OAuth token failed: Invalid client credentials. client_id={}, secret_match={}",
             payload.client_id,
-            payload.client_secret == config.oauth_client_secret
+            client_secret == config.oauth_client_secret
         );
         return Err(AppError::Authentication("Invalid client credentials".to_string()));
     }
@@ -349,7 +393,7 @@ pub async fn authorization_server_metadata(
         token_endpoint: format!("{}/oauth/token", base_url),
         response_types_supported: vec!["code".to_string()],
         grant_types_supported: vec!["authorization_code".to_string()],
-        token_endpoint_auth_methods_supported: vec!["client_secret_post".to_string()],
+        token_endpoint_auth_methods_supported: vec!["client_secret_post".to_string(), "client_secret_basic".to_string()],
         service_documentation: Some("https://github.com/yourusername/panicless-library".to_string()),
         ui_locales_supported: Some(vec!["en".to_string(), "it".to_string()]),
     })
