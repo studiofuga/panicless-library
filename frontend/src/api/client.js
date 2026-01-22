@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { useAuthStore } from '@/store/auth'
 import { loadConfig, getApiBaseURL } from './config'
 
 // Create axios instance with runtime config
@@ -19,9 +20,6 @@ export async function initializeApiClient() {
 // Request interceptor to add JWT token
 apiClient.interceptors.request.use(
   (config) => {
-    // Import useAuthStore inside the interceptor to avoid timing issues with Pinia
-    // This ensures Pinia is initialized before we try to use the store
-    const { useAuthStore } = require('@/store/auth')
     const authStore = useAuthStore()
     if (authStore.accessToken) {
       config.headers.Authorization = `Bearer ${authStore.accessToken}`
@@ -41,8 +39,6 @@ apiClient.interceptors.response.use(
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true
 
-      // Import useAuthStore inside the interceptor to avoid timing issues with Pinia
-      const { useAuthStore } = require('@/store/auth')
       const authStore = useAuthStore()
 
       try {
