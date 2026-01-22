@@ -70,6 +70,7 @@ pub fn create_router(pool: DbPool, config: Config) -> Router {
         .route("/api/users/:id", delete(handlers::delete_user))
         // Books
         .route("/api/books", get(handlers::list_books))
+        .route("/api/books/search/advanced", get(handlers::advanced_search_books))
         .route("/api/books", post(handlers::create_book))
         .route("/api/books/:id", get(handlers::get_book))
         .route("/api/books/:id", put(handlers::update_book))

@@ -105,3 +105,34 @@ impl Default for BookQuery {
         }
     }
 }
+
+#[derive(Debug, Deserialize)]
+pub struct AdvancedBookSearchQuery {
+    pub title: Option<String>,
+    pub author: Option<String>,
+    pub isbn: Option<String>,
+    pub edition: Option<String>,
+    pub publication_year: Option<i32>,
+    pub language: Option<String>,
+    pub publisher: Option<String>,
+    pub description: Option<String>,
+    pub page: Option<i64>,
+    pub limit: Option<i64>,
+}
+
+impl Default for AdvancedBookSearchQuery {
+    fn default() -> Self {
+        Self {
+            title: None,
+            author: None,
+            isbn: None,
+            edition: None,
+            publication_year: None,
+            language: None,
+            publisher: None,
+            description: None,
+            page: Some(1),
+            limit: Some(20),
+        }
+    }
+}

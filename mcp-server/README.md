@@ -136,7 +136,7 @@ Find books similar to book ID 3 for user 1
 
 ### 1. search_books
 
-Search books in user's library with pagination support.
+Search books in user's library with pagination support (simple search for title and author).
 
 **Parameters**:
 - `user_id` (required): User ID
@@ -165,7 +165,65 @@ Search books in user's library with pagination support.
 }
 ```
 
-### 2. get_book_details
+### 2. advanced_search_books
+
+Advanced search for books using multiple filter criteria.
+
+**Parameters**:
+- `user_id` (required): User ID
+- `title` (optional): Search in book title (case-insensitive partial match)
+- `author` (optional): Filter by author (case-insensitive partial match)
+- `isbn` (optional): Filter by exact ISBN number
+- `edition` (optional): Filter by edition (case-insensitive partial match)
+- `publication_year` (optional): Filter by publication year (exact match)
+- `language` (optional): Filter by language (case-insensitive partial match)
+- `publisher` (optional): Filter by publisher (case-insensitive partial match)
+- `description` (optional): Search in description (case-insensitive partial match)
+- `limit` (optional): Maximum number of results (default: 100, max: 500)
+- `offset` (optional): Number of results to skip for pagination (default: 0)
+
+**Example - Search by title and author**:
+```json
+{
+  "user_id": 1,
+  "title": "rust",
+  "author": "klabnik",
+  "limit": 20,
+  "offset": 0
+}
+```
+
+**Example - Search by ISBN and language**:
+```json
+{
+  "user_id": 1,
+  "isbn": "978-0132350884",
+  "language": "English"
+}
+```
+
+**Example - Search in description**:
+```json
+{
+  "user_id": 1,
+  "description": "programming",
+  "publication_year": 2023,
+  "limit": 50,
+  "offset": 100
+}
+```
+
+**Example - Search by publisher**:
+```json
+{
+  "user_id": 1,
+  "publisher": "Prentice",
+  "language": "English",
+  "limit": 25
+}
+```
+
+### 3. get_book_details
 
 Get detailed information about a specific book including all reading records.
 
@@ -181,7 +239,7 @@ Get detailed information about a specific book including all reading records.
 }
 ```
 
-### 3. list_readings
+### 4. list_readings
 
 List reading records for a user with pagination support.
 

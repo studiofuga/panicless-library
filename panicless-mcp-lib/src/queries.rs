@@ -278,6 +278,114 @@ pub async fn find_similar_books(
     .await
 }
 
+pub async fn advanced_search_books(
+    pool: &PgPool,
+    user_id: i32,
+    title: Option<&str>,
+    author: Option<&str>,
+    isbn: Option<&str>,
+    edition: Option<&str>,
+    publication_year: Option<i32>,
+    language: Option<&str>,
+    publisher: Option<&str>,
+    description: Option<&str>,
+    limit: Option<i64>,
+    offset: Option<i64>,
+) -> Result<Vec<Book>, sqlx::Error> {
+    let mut sql = String::from("SELECT id, user_id, title, author, edition, isbn, publication_year, publisher, pages, language, description, cover_image_url, created_at, updated_at FROM books WHERE user_id = $1");
+    let mut param_count = 2;
+
+    if title.is_some() {
+        sql.push_str(&format!(" AND title ILIKE ${}", param_count));
+        param_count += 1;
+    }
+
+    if author.is_some() {
+        sql.push_str(&format!(" AND author ILIKE ${}", param_count));
+        param_count += 1;
+    }
+
+    if isbn.is_some() {
+        sql.push_str(&format!(" AND isbn = ${}", param_count));
+        param_count += 1;
+    }
+
+    if edition.is_some() {
+        sql.push_str(&format!(" AND edition ILIKE ${}", param_count));
+        param_count += 1;
+    }
+
+    if publication_year.is_some() {
+        sql.push_str(&format!(" AND publication_year = ${}", param_count));
+        param_count += 1;
+    }
+
+    if language.is_some() {
+        sql.push_str(&format!(" AND language ILIKE ${}", param_count));
+        param_count += 1;
+    }
+
+    if publisher.is_some() {
+        sql.push_str(&format!(" AND publisher ILIKE ${}", param_count));
+        param_count += 1;
+    }
+
+    if description.is_some() {
+        sql.push_str(&format!(" AND description ILIKE ${}", param_count));
+        param_count += 1;
+    }
+
+    sql.push_str(" ORDER BY title");
+
+    let limit_val = limit.unwrap_or(100);
+    let offset_val = offset.unwrap_or(0);
+    sql.push_str(&format!(" LIMIT ${} OFFSET ${}", param_count, param_count + 1));
+
+    let mut query_builder = sqlx::query_as::<_, Book>(&sql).bind(user_id);
+
+    if let Some(t) = title {
+        let title_pattern = format!("%{}%", t);
+        query_builder = query_builder.bind(title_pattern);
+    }
+
+    if let Some(a) = author {
+        let author_pattern = format!("%{}%", a);
+        query_builder = query_builder.bind(author_pattern);
+    }
+
+    if let Some(i) = isbn {
+        query_builder = query_builder.bind(i);
+    }
+
+    if let Some(e) = edition {
+        let edition_pattern = format!("%{}%", e);
+        query_builder = query_builder.bind(edition_pattern);
+    }
+
+    if let Some(y) = publication_year {
+        query_builder = query_builder.bind(y);
+    }
+
+    if let Some(l) = language {
+        let language_pattern = format!("%{}%", l);
+        query_builder = query_builder.bind(language_pattern);
+    }
+
+    if let Some(p) = publisher {
+        let publisher_pattern = format!("%{}%", p);
+        query_builder = query_builder.bind(publisher_pattern);
+    }
+
+    if let Some(d) = description {
+        let description_pattern = format!("%{}%", d);
+        query_builder = query_builder.bind(description_pattern);
+    }
+
+    query_builder = query_builder.bind(limit_val).bind(offset_val);
+
+    query_builder.fetch_all(pool).await
+}
+
 pub async fn insert_book(
     pool: &PgPool,
     user_id: i32,

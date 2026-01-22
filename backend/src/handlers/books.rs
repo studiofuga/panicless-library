@@ -8,7 +8,7 @@ use crate::{
     db::DbPool,
     errors::{AppError, AppResult},
     middleware::Claims,
-    models::book::{Book, BookQuery, CreateBook, UpdateBook},
+    models::book::{Book, BookQuery, AdvancedBookSearchQuery, CreateBook, UpdateBook},
     models::reading::Reading,
 };
 
@@ -281,4 +281,109 @@ pub async fn get_book_readings(
     .await?;
 
     Ok(Json(readings))
+}
+
+pub async fn advanced_search_books(
+    State(pool): State<DbPool>,
+    Query(query): Query<AdvancedBookSearchQuery>,
+    claims: Claims,
+) -> AppResult<Json<Vec<Book>>> {
+
+    let page = query.page.unwrap_or(1);
+    let limit = query.limit.unwrap_or(20);
+    let offset = (page - 1) * limit;
+
+    let mut sql = String::from(
+        "SELECT id, user_id, title, author, edition, isbn, publication_year, publisher, pages, language, description, cover_image_url, created_at, updated_at FROM books WHERE user_id = $1"
+    );
+
+    let mut param_count = 2;
+
+    if query.title.is_some() {
+        sql.push_str(&format!(" AND title ILIKE ${}", param_count));
+        param_count += 1;
+    }
+
+    if query.author.is_some() {
+        sql.push_str(&format!(" AND author ILIKE ${}", param_count));
+        param_count += 1;
+    }
+
+    if query.isbn.is_some() {
+        sql.push_str(&format!(" AND isbn = ${}", param_count));
+        param_count += 1;
+    }
+
+    if query.edition.is_some() {
+        sql.push_str(&format!(" AND edition ILIKE ${}", param_count));
+        param_count += 1;
+    }
+
+    if query.publication_year.is_some() {
+        sql.push_str(&format!(" AND publication_year = ${}", param_count));
+        param_count += 1;
+    }
+
+    if query.language.is_some() {
+        sql.push_str(&format!(" AND language ILIKE ${}", param_count));
+        param_count += 1;
+    }
+
+    if query.publisher.is_some() {
+        sql.push_str(&format!(" AND publisher ILIKE ${}", param_count));
+        param_count += 1;
+    }
+
+    if query.description.is_some() {
+        sql.push_str(&format!(" AND description ILIKE ${}", param_count));
+        param_count += 1;
+    }
+
+    sql.push_str(&format!(" ORDER BY title LIMIT ${} OFFSET ${}", param_count, param_count + 1));
+
+    let mut query_builder = sqlx::query_as::<_, Book>(&sql).bind(claims.sub);
+
+    if let Some(title) = query.title {
+        let title_pattern = format!("%{}%", title);
+        query_builder = query_builder.bind(title_pattern);
+    }
+
+    if let Some(author) = query.author {
+        let author_pattern = format!("%{}%", author);
+        query_builder = query_builder.bind(author_pattern);
+    }
+
+    if let Some(isbn) = query.isbn {
+        query_builder = query_builder.bind(isbn);
+    }
+
+    if let Some(edition) = query.edition {
+        let edition_pattern = format!("%{}%", edition);
+        query_builder = query_builder.bind(edition_pattern);
+    }
+
+    if let Some(publication_year) = query.publication_year {
+        query_builder = query_builder.bind(publication_year);
+    }
+
+    if let Some(language) = query.language {
+        let language_pattern = format!("%{}%", language);
+        query_builder = query_builder.bind(language_pattern);
+    }
+
+    if let Some(publisher) = query.publisher {
+        let publisher_pattern = format!("%{}%", publisher);
+        query_builder = query_builder.bind(publisher_pattern);
+    }
+
+    if let Some(description) = query.description {
+        let description_pattern = format!("%{}%", description);
+        query_builder = query_builder.bind(description_pattern);
+    }
+
+    query_builder = query_builder.bind(limit).bind(offset);
+
+    let books = query_builder.fetch_all(&pool).await?;
+
+    Ok(Json(books))
 }

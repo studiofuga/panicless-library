@@ -40,6 +40,61 @@ pub fn get_tool_definitions() -> Vec<ToolDefinition> {
             }),
         },
         ToolDefinition {
+            name: "advanced_search_books".to_string(),
+            description: "Advanced search for books using multiple filter criteria: title, author, ISBN, edition, publication year, language, publisher, and description with pagination support".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "title": {
+                        "type": "string",
+                        "description": "Search in book title (case-insensitive partial match, optional)"
+                    },
+                    "author": {
+                        "type": "string",
+                        "description": "Filter by author name (case-insensitive partial match, optional)"
+                    },
+                    "isbn": {
+                        "type": "string",
+                        "description": "Filter by exact ISBN number (optional)"
+                    },
+                    "edition": {
+                        "type": "string",
+                        "description": "Filter by edition (case-insensitive partial match, optional)"
+                    },
+                    "publication_year": {
+                        "type": "integer",
+                        "description": "Filter by exact publication year (optional)",
+                        "minimum": 1000,
+                        "maximum": 9999
+                    },
+                    "language": {
+                        "type": "string",
+                        "description": "Filter by language (case-insensitive partial match, optional)"
+                    },
+                    "publisher": {
+                        "type": "string",
+                        "description": "Filter by publisher (case-insensitive partial match, optional)"
+                    },
+                    "description": {
+                        "type": "string",
+                        "description": "Search in book description (case-insensitive partial match, optional)"
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Maximum number of results to return (default: 100, max: 500)",
+                        "minimum": 1,
+                        "maximum": 500
+                    },
+                    "offset": {
+                        "type": "integer",
+                        "description": "Number of results to skip for pagination (default: 0)",
+                        "minimum": 0
+                    }
+                },
+                "required": []
+            }),
+        },
+        ToolDefinition {
             name: "get_book_details".to_string(),
             description: "Get detailed information about a specific book including all reading records".to_string(),
             input_schema: json!({
@@ -221,6 +276,7 @@ pub async fn execute_tool(
 
     match name {
         "search_books" => search_books(pool, args, user_id).await,
+        "advanced_search_books" => advanced_search_books(pool, args, user_id).await,
         "get_book_details" => get_book_details(pool, args, user_id).await,
         "list_readings" => list_readings(pool, args, user_id).await,
         "get_reading_statistics" => get_reading_statistics(pool, args, user_id).await,
@@ -257,6 +313,82 @@ async fn search_books(pool: &PgPool, args: Value, user_id: i32) -> Result<ToolCa
                 book.pages.map(|p| p.to_string()).unwrap_or_else(|| "N/A".to_string()),
                 book.isbn.as_deref().unwrap_or("N/A")
             ));
+        }
+        result
+    };
+
+    Ok(ToolCallResult {
+        content: vec![ContentItem::Text { text }],
+        is_error: None,
+    })
+}
+
+async fn advanced_search_books(pool: &PgPool, args: Value, user_id: i32) -> Result<ToolCallResult, String> {
+    let title = args["title"].as_str();
+    let author = args["author"].as_str();
+    let isbn = args["isbn"].as_str();
+    let edition = args["edition"].as_str();
+    let publication_year = args["publication_year"].as_i64().map(|y| y as i32);
+    let language = args["language"].as_str();
+    let publisher = args["publisher"].as_str();
+    let description = args["description"].as_str();
+    let limit = args["limit"].as_i64();
+    let offset = args["offset"].as_i64();
+
+    let books = queries::advanced_search_books(
+        pool,
+        user_id,
+        title,
+        author,
+        isbn,
+        edition,
+        publication_year,
+        language,
+        publisher,
+        description,
+        limit,
+        offset,
+    )
+    .await
+    .map_err(|e| e.to_string())?;
+
+    let text = if books.is_empty() {
+        "No books found matching your search criteria.".to_string()
+    } else {
+        let mut result = format!("Found {} book(s):\n\n", books.len());
+        for (i, book) in books.iter().enumerate() {
+            let mut book_info = format!(
+                "{}. {} by {}\n   Published: {}, Pages: {}\n   ISBN: {}\n",
+                i + 1,
+                book.title,
+                book.author.as_deref().unwrap_or("Unknown"),
+                book.publication_year.map(|y| y.to_string()).unwrap_or_else(|| "N/A".to_string()),
+                book.pages.map(|p| p.to_string()).unwrap_or_else(|| "N/A".to_string()),
+                book.isbn.as_deref().unwrap_or("N/A")
+            );
+
+            if let Some(edition) = &book.edition {
+                book_info.push_str(&format!("   Edition: {}\n", edition));
+            }
+
+            if let Some(language) = &book.language {
+                book_info.push_str(&format!("   Language: {}\n", language));
+            }
+
+            if let Some(publisher) = &book.publisher {
+                book_info.push_str(&format!("   Publisher: {}\n", publisher));
+            }
+
+            if let Some(description) = &book.description {
+                if description.len() > 150 {
+                    book_info.push_str(&format!("   Description: {}...\n", &description[..150]));
+                } else {
+                    book_info.push_str(&format!("   Description: {}\n", description));
+                }
+            }
+
+            book_info.push('\n');
+            result.push_str(&book_info);
         }
         result
     };

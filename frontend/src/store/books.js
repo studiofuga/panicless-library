@@ -47,6 +47,33 @@ export const useBooksStore = defineStore('books', () => {
     currentPage.value = 1 // Reset to first page when changing page size
   }
 
+  async function advancedSearch(filters = {}) {
+    loading.value = true
+    error.value = null
+    try {
+      // Include pagination parameters
+      const requestParams = {
+        page: currentPage.value,
+        limit: pageSize.value,
+        ...filters
+      }
+      const response = await apiClient.get('/api/books/search/advanced', { params: requestParams })
+      books.value = response.data
+
+      // Calculate total if we have less items than pageSize, it's the last page
+      if (response.data.length < pageSize.value) {
+        totalBooks.value = (currentPage.value - 1) * pageSize.value + response.data.length
+      }
+
+      return response.data
+    } catch (err) {
+      error.value = err.response?.data?.message || 'Advanced search failed'
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
   async function fetchBook(id) {
     loading.value = true
     error.value = null
@@ -145,6 +172,7 @@ export const useBooksStore = defineStore('books', () => {
     deleteBook,
     importGoodreadsCSV,
     setCurrentPage,
-    setPageSize
+    setPageSize,
+    advancedSearch
   }
 })

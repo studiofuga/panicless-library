@@ -179,6 +179,31 @@ List all books for the authenticated user with pagination support.
 - To get the next page, increment `page` parameter
 - Example: `GET /api/books?page=2&limit=20` returns items 21-40
 
+#### GET `/api/books/search/advanced`
+Advanced search for books with multiple filter criteria.
+
+**Query Parameters**:
+- `title`: Search in book title (case-insensitive partial match, optional)
+- `author`: Filter by author name (case-insensitive partial match, optional)
+- `isbn`: Filter by exact ISBN number (optional)
+- `edition`: Filter by edition (case-insensitive partial match, optional)
+- `publication_year`: Filter by exact publication year (optional)
+- `language`: Filter by language (case-insensitive partial match, optional)
+- `publisher`: Filter by publisher (case-insensitive partial match, optional)
+- `description`: Search in book description (case-insensitive partial match, optional)
+- `page`: Page number for pagination (default: 1, starting from 1)
+- `limit`: Items per page (default: 20, max: 100)
+
+**Response** (200 OK): Array of Book objects matching the search criteria
+
+**Examples**:
+```
+GET /api/books/search/advanced?title=rust&author=klabnik
+GET /api/books/search/advanced?isbn=978-0132350884&limit=10
+GET /api/books/search/advanced?publisher=NoStarch&language=English&publication_year=2023&page=1&limit=20
+GET /api/books/search/advanced?description=programming&publisher=Prentice&limit=50
+```
+
 **Response** (200 OK):
 ```json
 [
