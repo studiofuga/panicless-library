@@ -286,7 +286,8 @@ pub async fn authorization_server_metadata(
 
     Json(AuthorizationServerMetadata {
         issuer: base_url.clone(),
-        authorization_endpoint: format!("{}/oauth/authorize", base_url),
+        // Frontend authorization page (user-facing) - not the API endpoint
+        authorization_endpoint: format!("{}/authorize", base_url),
         token_endpoint: format!("{}/oauth/token", base_url),
         response_types_supported: vec!["code".to_string()],
         grant_types_supported: vec!["authorization_code".to_string()],
