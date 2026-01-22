@@ -23,7 +23,7 @@ pub async fn list_books(
     let offset = (page - 1) * limit;
 
     let mut sql = String::from(
-        "SELECT * FROM books WHERE user_id = $1"
+        "SELECT id, user_id, title, author, edition, isbn, publication_year, publisher, pages, language, description, cover_image_url, created_at, updated_at FROM books WHERE user_id = $1"
     );
 
     let mut param_count = 2;
@@ -75,7 +75,7 @@ pub async fn get_book(
 ) -> AppResult<Json<Book>> {
 
     let book = sqlx::query_as::<_, Book>(
-        "SELECT * FROM books WHERE id = $1 AND user_id = $2"
+        "SELECT id, user_id, title, author, edition, isbn, publication_year, publisher, pages, language, description, cover_image_url, created_at, updated_at FROM books WHERE id = $1 AND user_id = $2"
     )
     .bind(book_id)
     .bind(claims.sub)
@@ -98,7 +98,7 @@ pub async fn create_book(
     let book = sqlx::query_as::<_, Book>(
         "INSERT INTO books (user_id, title, author, edition, isbn, publication_year, publisher, pages, language, description, cover_image_url)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-         RETURNING *"
+         RETURNING id, user_id, title, author, edition, isbn, publication_year, publisher, pages, language, description, cover_image_url, created_at, updated_at"
     )
     .bind(claims.sub)
     .bind(&payload.title)
@@ -129,7 +129,7 @@ pub async fn update_book(
 
     // Verify book belongs to user
     let existing = sqlx::query_as::<_, Book>(
-        "SELECT * FROM books WHERE id = $1 AND user_id = $2"
+        "SELECT id, user_id, title, author, edition, isbn, publication_year, publisher, pages, language, description, cover_image_url, created_at, updated_at FROM books WHERE id = $1 AND user_id = $2"
     )
     .bind(book_id)
     .bind(claims.sub)
@@ -188,7 +188,7 @@ pub async fn update_book(
 
     updates.push("updated_at = CURRENT_TIMESTAMP".to_string());
     let sql = format!(
-        "UPDATE books SET {} WHERE id = ${} RETURNING *",
+        "UPDATE books SET {} WHERE id = ${} RETURNING id, user_id, title, author, edition, isbn, publication_year, publisher, pages, language, description, cover_image_url, created_at, updated_at",
         updates.join(", "),
         param_count
     );
@@ -264,7 +264,7 @@ pub async fn get_book_readings(
 
     // Verify book belongs to user
     let _ = sqlx::query_as::<_, Book>(
-        "SELECT * FROM books WHERE id = $1 AND user_id = $2"
+        "SELECT id, user_id, title, author, edition, isbn, publication_year, publisher, pages, language, description, cover_image_url, created_at, updated_at FROM books WHERE id = $1 AND user_id = $2"
     )
     .bind(book_id)
     .bind(claims.sub)
@@ -273,7 +273,7 @@ pub async fn get_book_readings(
     .ok_or_else(|| AppError::NotFound("Book not found".to_string()))?;
 
     let readings = sqlx::query_as::<_, Reading>(
-        "SELECT * FROM readings WHERE book_id = $1 AND user_id = $2 ORDER BY start_date DESC"
+        "SELECT id, user_id, book_id, start_date, end_date, rating, notes, created_at, updated_at FROM readings WHERE book_id = $1 AND user_id = $2 ORDER BY start_date DESC"
     )
     .bind(book_id)
     .bind(claims.sub)

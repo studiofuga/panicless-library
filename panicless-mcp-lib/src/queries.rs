@@ -64,7 +64,7 @@ pub async fn search_books(
     author: Option<&str>,
     year: Option<i32>,
 ) -> Result<Vec<Book>, sqlx::Error> {
-    let mut sql = String::from("SELECT * FROM books WHERE user_id = $1");
+    let mut sql = String::from("SELECT id, user_id, title, author, edition, isbn, publication_year, publisher, pages, language, description, cover_image_url, created_at, updated_at FROM books WHERE user_id = $1");
     let mut param_count = 2;
 
     if query.is_some() {
@@ -211,7 +211,7 @@ pub async fn get_reading_stats(
     .await?;
 
     let avg_rating: (Option<f64>,) = sqlx::query_as(
-        "SELECT AVG(rating) FROM readings WHERE user_id = $1 AND rating IS NOT NULL",
+        "SELECT AVG(rating)::DOUBLE PRECISION FROM readings WHERE user_id = $1 AND rating IS NOT NULL",
     )
     .bind(user_id)
     .fetch_one(pool)
@@ -244,7 +244,7 @@ pub async fn find_similar_books(
     book_id: i32,
 ) -> Result<Vec<Book>, sqlx::Error> {
     sqlx::query_as::<_, Book>(
-        "SELECT b2.* FROM books b1
+        "SELECT b2.id, b2.user_id, b2.title, b2.author, b2.edition, b2.isbn, b2.publication_year, b2.publisher, b2.pages, b2.language, b2.description, b2.cover_image_url, b2.created_at, b2.updated_at FROM books b1
          JOIN books b2 ON b1.author = b2.author AND b1.id != b2.id
          WHERE b1.id = $1 AND b1.user_id = $2 AND b2.user_id = $2
          ORDER BY b2.title

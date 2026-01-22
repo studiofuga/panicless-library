@@ -25,7 +25,7 @@ pub async fn list_readings(
     let offset = (page - 1) * limit;
 
     let mut sql = String::from(
-        "SELECT r.*, b.title as book_title, b.author as book_author
+        "SELECT r.id, r.user_id, r.book_id, r.start_date, r.end_date, r.rating, r.notes, r.created_at, r.updated_at, b.title as book_title, b.author as book_author
          FROM readings r
          JOIN books b ON r.book_id = b.id
          WHERE r.user_id = $1"
@@ -84,7 +84,7 @@ pub async fn get_reading(
 ) -> AppResult<Json<Reading>> {
 
     let reading = sqlx::query_as::<_, Reading>(
-        "SELECT * FROM readings WHERE id = $1 AND user_id = $2"
+        "SELECT id, user_id, book_id, start_date, end_date, rating, notes, created_at, updated_at FROM readings WHERE id = $1 AND user_id = $2"
     )
     .bind(reading_id)
     .bind(claims.sub)
@@ -117,7 +117,7 @@ pub async fn create_reading(
     let reading = sqlx::query_as::<_, Reading>(
         "INSERT INTO readings (user_id, book_id, start_date, end_date, rating, notes)
          VALUES ($1, $2, $3, $4, $5, $6)
-         RETURNING *"
+         RETURNING id, user_id, book_id, start_date, end_date, rating, notes, created_at, updated_at"
     )
     .bind(claims.sub)
     .bind(&payload.book_id)
@@ -160,7 +160,7 @@ pub async fn update_reading(
 
     // Verify reading belongs to user
     let existing = sqlx::query_as::<_, Reading>(
-        "SELECT * FROM readings WHERE id = $1 AND user_id = $2"
+        "SELECT id, user_id, book_id, start_date, end_date, rating, notes, created_at, updated_at FROM readings WHERE id = $1 AND user_id = $2"
     )
     .bind(reading_id)
     .bind(claims.sub)
@@ -195,7 +195,7 @@ pub async fn update_reading(
 
     updates.push("updated_at = CURRENT_TIMESTAMP".to_string());
     let sql = format!(
-        "UPDATE readings SET {} WHERE id = ${} RETURNING *",
+        "UPDATE readings SET {} WHERE id = ${} RETURNING id, user_id, book_id, start_date, end_date, rating, notes, created_at, updated_at",
         updates.join(", "),
         param_count
     );
@@ -256,7 +256,7 @@ pub async fn complete_reading(
 
     // Verify reading belongs to user and get existing data
     let existing = sqlx::query_as::<_, Reading>(
-        "SELECT * FROM readings WHERE id = $1 AND user_id = $2"
+        "SELECT id, user_id, book_id, start_date, end_date, rating, notes, created_at, updated_at FROM readings WHERE id = $1 AND user_id = $2"
     )
     .bind(reading_id)
     .bind(claims.sub)
@@ -274,7 +274,7 @@ pub async fn complete_reading(
     let reading = sqlx::query_as::<_, Reading>(
         "UPDATE readings SET end_date = $1, rating = $2, updated_at = CURRENT_TIMESTAMP
          WHERE id = $3
-         RETURNING *"
+         RETURNING id, user_id, book_id, start_date, end_date, rating, notes, created_at, updated_at"
     )
     .bind(&payload.end_date)
     .bind(&payload.rating)
@@ -324,7 +324,7 @@ pub async fn get_reading_stats(
 
     // Average rating
     let avg_rating: (Option<f64>,) = sqlx::query_as(
-        "SELECT AVG(rating) FROM readings WHERE user_id = $1 AND rating IS NOT NULL"
+        "SELECT AVG(rating)::DOUBLE PRECISION FROM readings WHERE user_id = $1 AND rating IS NOT NULL"
     )
     .bind(claims.sub)
     .fetch_one(&pool)

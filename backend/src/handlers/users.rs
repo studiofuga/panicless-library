@@ -22,7 +22,7 @@ pub async fn get_user(
     }
 
     let user = sqlx::query_as::<_, User>(
-        "SELECT * FROM users WHERE id = $1"
+        "SELECT id, username, email, password_hash, full_name, created_at, updated_at FROM users WHERE id = $1"
     )
     .bind(user_id)
     .fetch_optional(&pool)
@@ -58,7 +58,7 @@ pub async fn update_user(
         param_count += 1;
     }
 
-    query.push_str(&format!(" WHERE id = ${} RETURNING *", param_count));
+    query.push_str(&format!(" WHERE id = ${} RETURNING id, username, email, password_hash, full_name, created_at, updated_at", param_count));
 
     let mut query_builder = sqlx::query_as::<_, User>(&query);
 

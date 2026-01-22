@@ -27,7 +27,7 @@ pub async fn register(
 
     // Check if username already exists
     let existing_user = sqlx::query_as::<_, User>(
-        "SELECT * FROM users WHERE username = $1"
+        "SELECT id, username, email, password_hash, full_name, created_at, updated_at FROM users WHERE username = $1"
     )
     .bind(&payload.username)
     .fetch_optional(&pool)
@@ -39,7 +39,7 @@ pub async fn register(
 
     // Check if email already exists
     let existing_email = sqlx::query_as::<_, User>(
-        "SELECT * FROM users WHERE email = $1"
+        "SELECT id, username, email, password_hash, full_name, created_at, updated_at FROM users WHERE email = $1"
     )
     .bind(&payload.email)
     .fetch_optional(&pool)
@@ -61,7 +61,7 @@ pub async fn register(
     let user = sqlx::query_as::<_, User>(
         "INSERT INTO users (username, email, password_hash, full_name)
          VALUES ($1, $2, $3, $4)
-         RETURNING *"
+         RETURNING id, username, email, password_hash, full_name, created_at, updated_at"
     )
     .bind(&payload.username)
     .bind(&payload.email)
@@ -101,7 +101,7 @@ pub async fn login(
 ) -> AppResult<Json<AuthResponse>> {
     // Fetch user by username
     let user = sqlx::query_as::<_, User>(
-        "SELECT * FROM users WHERE username = $1"
+        "SELECT id, username, email, password_hash, full_name, created_at, updated_at FROM users WHERE username = $1"
     )
     .bind(&payload.username)
     .fetch_optional(&pool)
@@ -158,7 +158,7 @@ pub async fn refresh(
 
     // Fetch user to ensure they still exist
     let user = sqlx::query_as::<_, User>(
-        "SELECT * FROM users WHERE id = $1"
+        "SELECT id, username, email, password_hash, full_name, created_at, updated_at FROM users WHERE id = $1"
     )
     .bind(claims.sub)
     .fetch_optional(&pool)
@@ -194,7 +194,7 @@ pub async fn get_current_user(
     claims: Claims,
 ) -> AppResult<Json<UserResponse>> {
     let user = sqlx::query_as::<_, User>(
-        "SELECT * FROM users WHERE id = $1"
+        "SELECT id, username, email, password_hash, full_name, created_at, updated_at FROM users WHERE id = $1"
     )
     .bind(claims.sub)
     .fetch_optional(&pool)

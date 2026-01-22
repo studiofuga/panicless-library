@@ -46,7 +46,7 @@ pub async fn create_or_update_connector(
         DO UPDATE SET
             encrypted_token = $3,
             updated_at = NOW()
-        RETURNING *
+        RETURNING id, user_id, provider, encrypted_token, is_active, last_used_at, created_at, updated_at
         "#,
     )
     .bind(claims.sub)
@@ -69,7 +69,7 @@ pub async fn list_connectors(
     claims: Claims,
 ) -> AppResult<Json<Vec<ConnectorResponse>>> {
     let connectors = sqlx::query_as::<_, Connector>(
-        "SELECT * FROM connectors WHERE user_id = $1 ORDER BY created_at DESC",
+        "SELECT id, user_id, provider, encrypted_token, is_active, last_used_at, created_at, updated_at FROM connectors WHERE user_id = $1 ORDER BY created_at DESC",
     )
     .bind(claims.sub)
     .fetch_all(&pool)
@@ -91,7 +91,7 @@ pub async fn get_connector(
     Path(provider): Path<String>,
 ) -> AppResult<Json<ConnectorResponse>> {
     let connector = sqlx::query_as::<_, Connector>(
-        "SELECT * FROM connectors WHERE user_id = $1 AND provider = $2",
+        "SELECT id, user_id, provider, encrypted_token, is_active, last_used_at, created_at, updated_at FROM connectors WHERE user_id = $1 AND provider = $2",
     )
     .bind(claims.sub)
     .bind(&provider)
@@ -141,7 +141,7 @@ pub async fn toggle_connector(
     Path(provider): Path<String>,
 ) -> AppResult<Json<ConnectorResponse>> {
     let connector = sqlx::query_as::<_, Connector>(
-        "SELECT * FROM connectors WHERE user_id = $1 AND provider = $2",
+        "SELECT id, user_id, provider, encrypted_token, is_active, last_used_at, created_at, updated_at FROM connectors WHERE user_id = $1 AND provider = $2",
     )
     .bind(claims.sub)
     .bind(&provider)
@@ -156,7 +156,7 @@ pub async fn toggle_connector(
     let updated_connector = sqlx::query_as::<_, Connector>(
         "UPDATE connectors SET is_active = NOT is_active, updated_at = NOW()
          WHERE id = $1
-         RETURNING *",
+         RETURNING id, user_id, provider, encrypted_token, is_active, last_used_at, created_at, updated_at",
     )
     .bind(connector.id)
     .fetch_one(&pool)
