@@ -2,6 +2,7 @@
 members = [
     "backend",
     "mcp-server",
+    "mcp-oauth",
     "panicless-mcp-lib"
 ]
 

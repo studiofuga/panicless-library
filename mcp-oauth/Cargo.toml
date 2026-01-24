@@ -1,0 +1,54 @@
+[package]
+name = "mcp-oauth"
+version = "0.1.0"
+edition = "2021"
+authors = ["Federico Fuga <fuga@studiofuga.com>"]
+description = "Reusable OAuth 2.0 library for MCP servers with Axum"
+license = "MIT"
+repository = "https://github.com/studiofuga/mcp-oauth"
+keywords = ["oauth", "mcp", "axum", "authentication"]
+categories = ["authentication", "web-programming"]
+
+[dependencies]
+# Web framework
+axum = { version = "0.7", features = ["macros"] }
+tower = "0.4"
+
+# Async runtime
+tokio = { version = "1", features = ["rt-multi-thread"] }
+
+# Authentication
+jsonwebtoken = "9.2"
+
+# Encoding
+base64 = "0.22"
+rand = "0.8"
+sha2 = "0.10"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Error handling
+thiserror = "1.0"
+
+# Logging
+tracing = "0.1"
+
+# Time handling
+chrono = { version = "0.4", features = ["serde"] }
+
+# HTTP types
+http = "1.0"
+
+# Async trait
+async-trait = "0.1"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["full", "test-util"] }
+tower = { version = "0.4", features = ["util"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[[example]]
+name = "basic"
+path = "examples/basic.rs"
