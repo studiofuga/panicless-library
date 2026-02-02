@@ -102,11 +102,22 @@ pub fn transform_record(record: &GoodreadsRecord) -> Result<TransformedBook, Str
             // For currently reading, use date_added as start_date, no end_date
             (date_added, None)
         }
+        "abandoned" => {
+            // For abandoned books, use date_added as start_date, no end_date
+            (date_added, None)
+        }
         _ => {
             // For to-read or unknown, no reading record will be created
             (None, None)
         }
     };
+
+    // Parse bookshelves
+    let bookshelves = record
+        .bookshelves
+        .as_ref()
+        .map(|s| parse_bookshelves(s))
+        .unwrap_or_default();
 
     Ok(TransformedBook {
         title: title.to_string(),
@@ -120,6 +131,7 @@ pub fn transform_record(record: &GoodreadsRecord) -> Result<TransformedBook, Str
         notes,
         start_date,
         end_date,
+        bookshelves,
     })
 }
 
@@ -168,6 +180,16 @@ fn clean_isbn(isbn: &str) -> String {
         .replace('-', "")
         .replace('\"', "")
         .replace('=', "")
+}
+
+/// Parse bookshelves CSV field: "favorites, non-fiction, 2024-reads" → vec of strings
+fn parse_bookshelves(shelves_str: &str) -> Vec<String> {
+    shelves_str
+        .split(',')
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string())
+        .collect()
 }
 
 /// Combine review and private notes into a single notes field

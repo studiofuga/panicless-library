@@ -91,6 +91,7 @@ pub struct TransformedBook {
     pub notes: Option<String>,
     pub start_date: Option<NaiveDate>,
     pub end_date: Option<NaiveDate>,
+    pub bookshelves: Vec<String>,
 }
 
 /// Response for the import operation

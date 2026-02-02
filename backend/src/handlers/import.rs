@@ -1,4 +1,6 @@
 use axum::{extract::{Multipart, State}, Json};
+use chrono::NaiveDate;
+use sqlx::{Postgres, Transaction};
 use std::collections::HashMap;
 
 use crate::{
@@ -280,49 +282,65 @@ async fn process_book_import(
         (new_id, "created")
     };
 
+    // Import bookshelves for this book
+    if !book.bookshelves.is_empty() {
+        import_bookshelves(&mut tx, user_id, book_id, &book.bookshelves).await?;
+    }
+
     // Handle reading creation based on shelf
     let mut reading_created = false;
     let shelf_lower = book.shelf.to_lowercase();
 
     match shelf_lower.as_str() {
         "read" => {
-            // Create completed reading
-            if let (Some(start), Some(end)) = (book.start_date, book.end_date) {
-                sqlx::query(
-                    "INSERT INTO readings (user_id, book_id, start_date, end_date, rating, notes)
-                     VALUES ($1, $2, $3, $4, $5, $6)
-                     ON CONFLICT DO NOTHING",
+            // Create completed reading (start_date can be None)
+            if let Some(end) = book.end_date {
+                handle_read_reading_with_update(
+                    &mut tx,
+                    user_id,
+                    book_id,
+                    book.start_date,
+                    end,
+                    &book.rating,
+                    &book.notes,
                 )
-                .bind(user_id)
-                .bind(book_id)
-                .bind(start)
-                .bind(end)
-                .bind(&book.rating)
-                .bind(&book.notes)
-                .execute(&mut *tx)
                 .await?;
-
                 reading_created = true;
             }
         }
         "currently-reading" => {
             // Create active reading (no end_date)
-            if let Some(start) = book.start_date {
-                sqlx::query(
-                    "INSERT INTO readings (user_id, book_id, start_date, end_date, rating, notes)
-                     VALUES ($1, $2, $3, NULL, $4, $5)
-                     ON CONFLICT DO NOTHING",
-                )
-                .bind(user_id)
-                .bind(book_id)
-                .bind(start)
-                .bind(&book.rating)
-                .bind(&book.notes)
-                .execute(&mut *tx)
-                .await?;
+            sqlx::query(
+                "INSERT INTO readings (user_id, book_id, start_date, end_date, rating, notes, abandoned)
+                 VALUES ($1, $2, $3, NULL, $4, $5, FALSE)
+                 ON CONFLICT DO NOTHING",
+            )
+            .bind(user_id)
+            .bind(book_id)
+            .bind(book.start_date)
+            .bind(&book.rating)
+            .bind(&book.notes)
+            .execute(&mut *tx)
+            .await?;
 
-                reading_created = true;
-            }
+            reading_created = true;
+        }
+        "abandoned" => {
+            // Create abandoned reading (end_date NULL, abandoned flag TRUE)
+            sqlx::query(
+                "INSERT INTO readings (user_id, book_id, start_date, end_date, rating, notes, abandoned)
+                 VALUES ($1, $2, $3, NULL, $4, $5, TRUE)
+                 ON CONFLICT DO NOTHING",
+            )
+            .bind(user_id)
+            .bind(book_id)
+            .bind(book.start_date)
+            .bind(&book.rating)
+            .bind(&book.notes)
+            .execute(&mut *tx)
+            .await?;
+
+            reading_created = true;
         }
         _ => {
             // "to-read" or unknown shelf - no reading record
@@ -337,4 +355,98 @@ async fn process_book_import(
         operation: operation.to_string(),
         reading_created,
     })
+}
+
+/// Handle a "read" reading with duplicate detection and conditional update.
+/// If a reading with a similar end_date (±7 days) exists, update only NULL rating/notes.
+/// Otherwise, insert a new reading.
+async fn handle_read_reading_with_update(
+    tx: &mut Transaction<'_, Postgres>,
+    user_id: i32,
+    book_id: i32,
+    start_date: Option<NaiveDate>,
+    end_date: NaiveDate,
+    rating: &Option<i32>,
+    notes: &Option<String>,
+) -> Result<(), sqlx::Error> {
+    // Look for existing reading with similar end_date (±7 days)
+    let existing = sqlx::query_scalar::<_, i32>(
+        "SELECT id FROM readings
+         WHERE user_id = $1 AND book_id = $2
+         AND end_date IS NOT NULL
+         AND ABS(EXTRACT(DAY FROM (end_date - $3::date))) <= 7
+         LIMIT 1",
+    )
+    .bind(user_id)
+    .bind(book_id)
+    .bind(end_date)
+    .fetch_optional(&mut **tx)
+    .await?;
+
+    if let Some(reading_id) = existing {
+        // Update only NULL fields (don't overwrite existing data)
+        sqlx::query(
+            "UPDATE readings
+             SET rating = COALESCE(rating, $1),
+                 notes = COALESCE(notes, $2),
+                 updated_at = CURRENT_TIMESTAMP
+             WHERE id = $3",
+        )
+        .bind(rating)
+        .bind(notes)
+        .bind(reading_id)
+        .execute(&mut **tx)
+        .await?;
+    } else {
+        // Insert new reading (start_date can be NULL)
+        sqlx::query(
+            "INSERT INTO readings (user_id, book_id, start_date, end_date, rating, notes, abandoned)
+             VALUES ($1, $2, $3, $4, $5, $6, FALSE)",
+        )
+        .bind(user_id)
+        .bind(book_id)
+        .bind(start_date)
+        .bind(end_date)
+        .bind(rating)
+        .bind(notes)
+        .execute(&mut **tx)
+        .await?;
+    }
+
+    Ok(())
+}
+
+/// Import bookshelves for a book (upsert shelves and create many-to-many links)
+async fn import_bookshelves(
+    tx: &mut Transaction<'_, Postgres>,
+    user_id: i32,
+    book_id: i32,
+    shelves: &[String],
+) -> Result<(), sqlx::Error> {
+    for shelf_name in shelves {
+        // Upsert bookshelf (get or create)
+        let bookshelf_id = sqlx::query_scalar::<_, i32>(
+            "INSERT INTO bookshelves (user_id, name)
+             VALUES ($1, $2)
+             ON CONFLICT (user_id, name) DO UPDATE SET name = EXCLUDED.name
+             RETURNING id",
+        )
+        .bind(user_id)
+        .bind(shelf_name)
+        .fetch_one(&mut **tx)
+        .await?;
+
+        // Link book to bookshelf (ignore if already linked)
+        sqlx::query(
+            "INSERT INTO book_bookshelves (book_id, bookshelf_id)
+             VALUES ($1, $2)
+             ON CONFLICT (book_id, bookshelf_id) DO NOTHING",
+        )
+        .bind(book_id)
+        .bind(bookshelf_id)
+        .execute(&mut **tx)
+        .await?;
+    }
+
+    Ok(())
 }
