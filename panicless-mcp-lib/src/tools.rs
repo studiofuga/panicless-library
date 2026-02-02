@@ -160,7 +160,11 @@ pub fn get_tool_definitions() -> Vec<ToolDefinition> {
                 "properties": {
                     "book_id": {
                         "type": "integer",
-                        "description": "Book ID to find similar books for (required)"
+                        "description": "Book ID to find similar books for (provide this or book_title)"
+                    },
+                    "book_title": {
+                        "type": "string",
+                        "description": "Book title to search for (alternative to book_id). If multiple books match, an error with the list of matches is returned."
                     },
                     "limit": {
                         "type": "integer",
@@ -174,7 +178,7 @@ pub fn get_tool_definitions() -> Vec<ToolDefinition> {
                         "minimum": 0
                     }
                 },
-                "required": ["book_id"]
+                "required": []
             }),
         },
         ToolDefinition {
@@ -227,7 +231,11 @@ pub fn get_tool_definitions() -> Vec<ToolDefinition> {
                 "properties": {
                     "book_id": {
                         "type": "integer",
-                        "description": "Book ID to create a reading record for (required)"
+                        "description": "Book ID to create a reading record for (provide this or book_title)"
+                    },
+                    "book_title": {
+                        "type": "string",
+                        "description": "Book title to search for (alternative to book_id). If multiple books match, an error with the list of matches is returned."
                     },
                     "start_date": {
                         "type": "string",
@@ -238,7 +246,7 @@ pub fn get_tool_definitions() -> Vec<ToolDefinition> {
                         "description": "End date in YYYY-MM-DD format (optional)"
                     }
                 },
-                "required": ["book_id", "start_date"]
+                "required": ["start_date"]
             }),
         },
         ToolDefinition {
@@ -305,8 +313,9 @@ async fn search_books(pool: &PgPool, args: Value, user_id: i32) -> Result<ToolCa
         let mut result = format!("Found {} book(s):\n\n", books.len());
         for (i, book) in books.iter().enumerate() {
             result.push_str(&format!(
-                "{}. {} by {}\n   Published: {}, Pages: {}\n   ISBN: {}\n\n",
+                "{}. [ID: {}] {} by {}\n   Published: {}, Pages: {}\n   ISBN: {}\n\n",
                 i + 1,
+                book.id,
                 book.title,
                 book.author.as_deref().unwrap_or("Unknown"),
                 book.publication_year.map(|y| y.to_string()).unwrap_or_else(|| "N/A".to_string()),
@@ -358,8 +367,9 @@ async fn advanced_search_books(pool: &PgPool, args: Value, user_id: i32) -> Resu
         let mut result = format!("Found {} book(s):\n\n", books.len());
         for (i, book) in books.iter().enumerate() {
             let mut book_info = format!(
-                "{}. {} by {}\n   Published: {}, Pages: {}\n   ISBN: {}\n",
+                "{}. [ID: {}] {} by {}\n   Published: {}, Pages: {}\n   ISBN: {}\n",
                 i + 1,
+                book.id,
                 book.title,
                 book.author.as_deref().unwrap_or("Unknown"),
                 book.publication_year.map(|y| y.to_string()).unwrap_or_else(|| "N/A".to_string()),
@@ -405,10 +415,11 @@ async fn get_book_details(pool: &PgPool, args: Value, user_id: i32) -> Result<To
     let book = queries::get_book_with_readings(pool, user_id, book_id)
         .await
         .map_err(|e| e.to_string())?
-        .ok_or_else(|| "Book not found".to_string())?;
+        .ok_or_else(|| format!("Book with ID {} not found. Use the search_books tool to find the correct book ID.", book_id))?;
 
     let text = format!(
-        "Book Details:\n\nTitle: {}\nAuthor: {}\nEdition: {}\nISBN: {}\nPublished: {} by {}\nPages: {}\nLanguage: {}\n\nDescription:\n{}\n\nReading History ({} time(s) read):\n{}",
+        "Book Details:\n\nBook ID: {}\nTitle: {}\nAuthor: {}\nEdition: {}\nISBN: {}\nPublished: {} by {}\nPages: {}\nLanguage: {}\n\nDescription:\n{}\n\nReading History ({} time(s) read):\n{}",
+        book.id,
         book.title,
         book.author.as_deref().unwrap_or("Unknown"),
         book.edition.as_deref().unwrap_or("N/A"),
@@ -444,8 +455,10 @@ async fn list_readings(pool: &PgPool, args: Value, user_id: i32) -> Result<ToolC
         let mut result = format!("Found {} reading(s):\n\n", readings.len());
         for (i, reading) in readings.iter().enumerate() {
             result.push_str(&format!(
-                "{}. {} by {}\n   Started: {}, Finished: {}\n   Rating: {}\n   Notes: {}\n\n",
+                "{}. [Reading ID: {}, Book ID: {}] {} by {}\n   Started: {}, Finished: {}\n   Rating: {}\n   Notes: {}\n\n",
                 i + 1,
+                reading.id,
+                reading.book_id,
                 reading.book_title,
                 reading.book_author.as_deref().unwrap_or("Unknown"),
                 reading.start_date,
@@ -493,9 +506,28 @@ async fn get_reading_statistics(pool: &PgPool, _args: Value, user_id: i32) -> Re
 }
 
 async fn find_similar_books(pool: &PgPool, args: Value, user_id: i32) -> Result<ToolCallResult, String> {
-    let book_id = args["book_id"].as_i64().ok_or("book_id is required")? as i32;
+    let book_id = match resolve_book_id(pool, &args, user_id).await {
+        Ok(id) => id,
+        Err(err_result) => return Ok(err_result),
+    };
     let limit = args["limit"].as_i64();
     let offset = args["offset"].as_i64();
+
+    // Validate that the book exists
+    let exists = queries::book_exists(pool, user_id, book_id)
+        .await
+        .map_err(|e| e.to_string())?;
+    if !exists {
+        return Ok(ToolCallResult {
+            content: vec![ContentItem::Text {
+                text: format!(
+                    "Book with ID {} not found. Use the search_books tool to find the correct book ID.",
+                    book_id
+                ),
+            }],
+            is_error: Some(true),
+        });
+    }
 
     let similar = queries::find_similar_books(pool, user_id, book_id, limit, offset)
         .await
@@ -507,8 +539,9 @@ async fn find_similar_books(pool: &PgPool, args: Value, user_id: i32) -> Result<
         let mut result = format!("Found {} similar book(s):\n\n", similar.len());
         for (i, book) in similar.iter().enumerate() {
             result.push_str(&format!(
-                "{}. {} by {}\n   Published: {}\n\n",
+                "{}. [ID: {}] {} by {}\n   Published: {}\n\n",
                 i + 1,
+                book.id,
                 book.title,
                 book.author.as_deref().unwrap_or("Unknown"),
                 book.publication_year.map(|y| y.to_string()).unwrap_or_else(|| "N/A".to_string())
@@ -521,6 +554,71 @@ async fn find_similar_books(pool: &PgPool, args: Value, user_id: i32) -> Result<
         content: vec![ContentItem::Text { text }],
         is_error: None,
     })
+}
+
+/// Resolve a book_id from either an explicit book_id or a book_title search.
+/// Returns the resolved book_id or a ToolCallResult error.
+async fn resolve_book_id(
+    pool: &PgPool,
+    args: &Value,
+    user_id: i32,
+) -> Result<i32, ToolCallResult> {
+    let book_id = args["book_id"].as_i64().map(|id| id as i32);
+    let book_title = args["book_title"].as_str();
+
+    match (book_id, book_title) {
+        (Some(id), _) => Ok(id),
+        (None, Some(title)) => {
+            let matches = queries::find_book_by_title(pool, user_id, title)
+                .await
+                .map_err(|e| ToolCallResult {
+                    content: vec![ContentItem::Text { text: e.to_string() }],
+                    is_error: Some(true),
+                })?;
+
+            match matches.len() {
+                0 => Err(ToolCallResult {
+                    content: vec![ContentItem::Text {
+                        text: format!(
+                            "No book found with title '{}'. Use search_books to find the correct book.",
+                            title
+                        ),
+                    }],
+                    is_error: Some(true),
+                }),
+                1 => Ok(matches[0].id),
+                _ => {
+                    let list = matches
+                        .iter()
+                        .map(|b| {
+                            format!(
+                                "  - [ID: {}] {} by {}",
+                                b.id,
+                                b.title,
+                                b.author.as_deref().unwrap_or("Unknown")
+                            )
+                        })
+                        .collect::<Vec<_>>()
+                        .join("\n");
+                    Err(ToolCallResult {
+                        content: vec![ContentItem::Text {
+                            text: format!(
+                                "Multiple books match '{}':\n{}\nPlease specify the book_id directly.",
+                                title, list
+                            ),
+                        }],
+                        is_error: Some(true),
+                    })
+                }
+            }
+        }
+        (None, None) => Err(ToolCallResult {
+            content: vec![ContentItem::Text {
+                text: "Either book_id or book_title must be provided.".to_string(),
+            }],
+            is_error: Some(true),
+        }),
+    }
 }
 
 async fn create_book(pool: &PgPool, args: Value, user_id: i32) -> Result<ToolCallResult, String> {
@@ -565,7 +663,10 @@ async fn create_book(pool: &PgPool, args: Value, user_id: i32) -> Result<ToolCal
 
 async fn create_reading(pool: &PgPool, args: Value, user_id: i32) -> Result<ToolCallResult, String> {
     use chrono::NaiveDate;
-    let book_id = args["book_id"].as_i64().ok_or("book_id is required")? as i32;
+    let book_id = match resolve_book_id(pool, &args, user_id).await {
+        Ok(id) => id,
+        Err(err_result) => return Ok(err_result),
+    };
     let start_date_str = args["start_date"].as_str().ok_or("start_date is required")?;
     let end_date_str = args["end_date"].as_str();
 
@@ -583,7 +684,14 @@ async fn create_reading(pool: &PgPool, args: Value, user_id: i32) -> Result<Tool
 
     let reading_id = queries::insert_reading(pool, user_id, book_id, start_date, end_date)
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| {
+            let msg = e.to_string();
+            if msg.contains("foreign key") || msg.contains("violates") {
+                format!("Book with ID {} not found. Use search_books to find the correct book ID.", book_id)
+            } else {
+                msg
+            }
+        })?;
 
     let text = format!(
         "Reading record created successfully!\n\nReading ID: {}\nBook ID: {}\nStart Date: {}\nEnd Date: {}\n\nYou can now add a review and rating to this reading record.",
@@ -623,7 +731,7 @@ async fn update_reading_review(pool: &PgPool, args: Value, user_id: i32) -> Resu
             notes.unwrap_or("Not set")
         )
     } else {
-        "Reading record not found or you don't have permission to update it.".to_string()
+        format!("Reading with ID {} not found. Use list_readings to find the correct reading ID.", reading_id)
     };
 
     Ok(ToolCallResult {

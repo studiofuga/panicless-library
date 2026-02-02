@@ -386,6 +386,36 @@ pub async fn advanced_search_books(
     query_builder.fetch_all(pool).await
 }
 
+pub async fn find_book_by_title(
+    pool: &PgPool,
+    user_id: i32,
+    title: &str,
+) -> Result<Vec<Book>, sqlx::Error> {
+    let title_pattern = format!("%{}%", title);
+    sqlx::query_as::<_, Book>(
+        "SELECT id, user_id, title, author, edition, isbn, publication_year, publisher, pages, language, description, cover_image_url, created_at, updated_at FROM books WHERE user_id = $1 AND title ILIKE $2 ORDER BY title"
+    )
+    .bind(user_id)
+    .bind(title_pattern)
+    .fetch_all(pool)
+    .await
+}
+
+pub async fn book_exists(
+    pool: &PgPool,
+    user_id: i32,
+    book_id: i32,
+) -> Result<bool, sqlx::Error> {
+    let result: (bool,) = sqlx::query_as(
+        "SELECT EXISTS(SELECT 1 FROM books WHERE id = $1 AND user_id = $2)"
+    )
+    .bind(book_id)
+    .bind(user_id)
+    .fetch_one(pool)
+    .await?;
+    Ok(result.0)
+}
+
 pub async fn insert_book(
     pool: &PgPool,
     user_id: i32,
