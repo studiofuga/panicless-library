@@ -38,6 +38,7 @@ WORKDIR /app
 COPY Cargo.toml Cargo.lock ./
 COPY panicless-mcp-lib ./panicless-mcp-lib
 COPY mcp-server ./mcp-server
+COPY mcp-oauth ./mcp-oauth
 COPY backend ./backend
 
 # Build the backend application in release mode
