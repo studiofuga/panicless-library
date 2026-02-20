@@ -374,7 +374,7 @@ async fn handle_read_reading_with_update(
         "SELECT id FROM readings
          WHERE user_id = $1 AND book_id = $2
          AND end_date IS NOT NULL
-         AND ABS(EXTRACT(DAY FROM (end_date - $3::date))) <= 7
+         AND ABS(end_date - $3::date) <= 7
          LIMIT 1",
     )
     .bind(user_id)

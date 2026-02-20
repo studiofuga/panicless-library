@@ -264,11 +264,13 @@ pub async fn complete_reading(
     .await?
     .ok_or_else(|| AppError::NotFound("Reading not found".to_string()))?;
 
-    // Validate end_date >= start_date
-    if payload.end_date < existing.start_date {
-        return Err(AppError::Validation(
-            "End date must be after start date".to_string(),
-        ));
+    // Validate end_date >= start_date (only if start_date is set)
+    if let Some(start) = existing.start_date {
+        if payload.end_date < start {
+            return Err(AppError::Validation(
+                "End date must be after start date".to_string(),
+            ));
+        }
     }
 
     let reading = sqlx::query_as::<_, Reading>(
