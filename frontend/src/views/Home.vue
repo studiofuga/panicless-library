@@ -8,8 +8,8 @@
       <n-button type="primary" size="large" @click="$router.push('/register')" v-if="!isAuthenticated">
         Get Started
       </n-button>
-      <n-button type="primary" size="large" @click="$router.push('/dashboard')" v-else>
-        Go to Dashboard
+      <n-button type="primary" size="large" @click="$router.push('/statistics')" v-else>
+        Go to Statistics
       </n-button>
       <n-button size="large" @click="$router.push('/login')" v-if="!isAuthenticated">
         Login

@@ -163,6 +163,135 @@
             </n-space>
           </div>
         </n-tab-pane>
+
+        <!-- Import / Export Tab -->
+        <n-tab-pane name="import-export" tab="Import / Export">
+          <div class="tab-content">
+            <n-space vertical :size="24">
+              <!-- Import Section -->
+              <div>
+                <h3 style="margin: 0 0 16px 0">Import from Goodreads</h3>
+                <n-alert type="info" title="How to export from Goodreads" style="margin-bottom: 16px;">
+                  <ol style="margin: 8px 0 0 0; padding-left: 20px;">
+                    <li>Go to Goodreads and navigate to "My Books"</li>
+                    <li>Click "Import and export" at the top</li>
+                    <li>Click "Export Library" to download your CSV file</li>
+                    <li>Upload the downloaded CSV file below</li>
+                  </ol>
+                </n-alert>
+
+                <n-upload
+                  :custom-request="handleUpload"
+                  :show-file-list="true"
+                  :max="1"
+                  accept=".csv"
+                  @change="handleFileChange"
+                  :disabled="importing"
+                >
+                  <n-button :disabled="importing">
+                    Select CSV File
+                  </n-button>
+                </n-upload>
+
+                <n-space v-if="selectedFile" style="margin-top: 12px;">
+                  <n-tag type="success">
+                    Selected: {{ selectedFile.name }} ({{ formatFileSize(selectedFile.size) }})
+                  </n-tag>
+                </n-space>
+
+                <n-button
+                  v-if="selectedFile"
+                  type="primary"
+                  size="large"
+                  :loading="importing"
+                  @click="handleImport"
+                  block
+                  style="margin-top: 12px;"
+                >
+                  {{ importing ? 'Importing...' : 'Import Books' }}
+                </n-button>
+
+                <!-- Import Progress / Result -->
+                <div v-if="importing || importResult" style="margin-top: 16px;">
+                  <n-spin v-if="importing" size="large">
+                    <template #description>
+                      Importing your books... This may take a moment.
+                    </template>
+                  </n-spin>
+
+                  <div v-if="importResult && !importing">
+                    <n-alert
+                      :type="importResult.summary.failed_imports === 0 ? 'success' : 'warning'"
+                      :title="importResult.summary.failed_imports === 0 ? 'Import Completed Successfully!' : 'Import Completed with Some Errors'"
+                      style="margin-bottom: 16px;"
+                    >
+                      <n-space>
+                        <n-statistic label="Total Rows" :value="importResult.summary.total_rows" />
+                        <n-statistic label="Successful" :value="importResult.summary.successful_imports" />
+                        <n-statistic label="Failed" :value="importResult.summary.failed_imports" />
+                        <n-statistic label="Books Created" :value="importResult.summary.books_created" />
+                        <n-statistic label="Books Updated" :value="importResult.summary.books_updated" />
+                        <n-statistic label="Readings Created" :value="importResult.summary.readings_created" />
+                      </n-space>
+                    </n-alert>
+
+                    <n-card v-if="importResult.errors.length > 0" title="Errors" size="small" :bordered="false">
+                      <n-list bordered>
+                        <n-list-item v-for="error in importResult.errors" :key="error.row_number">
+                          <n-thing>
+                            <template #header>
+                              Row {{ error.row_number }}
+                              <span v-if="error.book_title"> - {{ error.book_title }}</span>
+                            </template>
+                            <template #description>
+                              <n-text type="error">{{ error.error }}</n-text>
+                            </template>
+                          </n-thing>
+                        </n-list-item>
+                      </n-list>
+                    </n-card>
+
+                    <n-space justify="end" style="margin-top: 12px;">
+                      <n-button @click="resetImport">Import Another File</n-button>
+                    </n-space>
+                  </div>
+                </div>
+              </div>
+
+              <n-divider />
+
+              <!-- Export Section -->
+              <div>
+                <h3 style="margin: 0 0 16px 0">Export</h3>
+                <n-alert type="info" :closable="false">
+                  Export functionality is coming soon.
+                </n-alert>
+                <n-button disabled style="margin-top: 12px;">
+                  Export Library (Coming Soon)
+                </n-button>
+              </div>
+            </n-space>
+          </div>
+        </n-tab-pane>
+
+        <!-- Danger Zone Tab -->
+        <n-tab-pane name="danger-zone" tab="Danger Zone">
+          <div class="tab-content">
+            <n-alert type="error" :closable="false" style="margin-bottom: 24px;">
+              Actions in this section are irreversible. Please proceed with caution.
+            </n-alert>
+
+            <n-card style="border: 1px solid #e88080;">
+              <h3 style="margin: 0 0 12px 0; color: #d03050;">Delete All Data</h3>
+              <p style="margin: 0 0 16px 0; color: #666;">
+                This will permanently delete all your books and reading records. This action cannot be undone.
+              </p>
+              <n-button type="error" @click="handleDeleteAllData" :loading="deletingAllData">
+                Delete All My Data
+              </n-button>
+            </n-card>
+          </div>
+        </n-tab-pane>
       </n-tabs>
     </n-card>
   </div>
@@ -171,8 +300,9 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { useMessage } from 'naive-ui'
+import { useMessage, useDialog } from 'naive-ui'
 import { useAuthStore } from '@/store/auth'
+import { useBooksStore } from '@/store/books'
 import { useConnectorsStore } from '@/store/connectors'
 import { formatDistanceToNow } from 'date-fns'
 import ConnectorCard from '@/components/connectors/ConnectorCard.vue'
@@ -180,7 +310,9 @@ import apiClient from '@/api/client'
 
 const router = useRouter()
 const message = useMessage()
+const dialog = useDialog()
 const authStore = useAuthStore()
+const booksStore = useBooksStore()
 const connectorsStore = useConnectorsStore()
 
 // Version info
@@ -295,6 +427,90 @@ const showLogoutConfirm = () => {
       authStore.logout()
       router.push('/login')
       message.success('Logged out successfully')
+    }
+  })
+}
+
+// Import functionality
+const selectedFile = ref(null)
+const importing = ref(false)
+const importResult = ref(null)
+
+function handleFileChange(options) {
+  if (options.fileList.length > 0) {
+    selectedFile.value = options.fileList[0].file
+  } else {
+    selectedFile.value = null
+  }
+}
+
+function handleUpload({ file, onFinish }) {
+  selectedFile.value = file.file
+  onFinish()
+}
+
+async function handleImport() {
+  if (!selectedFile.value) {
+    message.error('Please select a CSV file first')
+    return
+  }
+  if (!selectedFile.value.name.endsWith('.csv')) {
+    message.error('Please select a valid CSV file')
+    return
+  }
+  if (selectedFile.value.size > 10 * 1024 * 1024) {
+    message.error('File size must be less than 10MB')
+    return
+  }
+
+  importing.value = true
+  importResult.value = null
+
+  try {
+    const result = await booksStore.importGoodreadsCSV(selectedFile.value)
+    importResult.value = result
+    if (result.summary.failed_imports === 0) {
+      message.success(`Successfully imported ${result.summary.successful_imports} books!`)
+    } else {
+      message.warning(`Imported ${result.summary.successful_imports} books with ${result.summary.failed_imports} errors`)
+    }
+  } catch (error) {
+    message.error(error.response?.data?.error || 'Failed to import CSV file')
+  } finally {
+    importing.value = false
+  }
+}
+
+function resetImport() {
+  selectedFile.value = null
+  importResult.value = null
+}
+
+function formatFileSize(bytes) {
+  if (bytes < 1024) return bytes + ' B'
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + ' KB'
+  return (bytes / (1024 * 1024)).toFixed(2) + ' MB'
+}
+
+// Danger Zone
+const deletingAllData = ref(false)
+
+const handleDeleteAllData = () => {
+  dialog.error({
+    title: 'Delete All Data',
+    content: 'Are you absolutely sure? This will permanently delete ALL your books and reading records. This action CANNOT be undone.',
+    positiveText: 'Yes, Delete Everything',
+    negativeText: 'Cancel',
+    onPositiveClick: async () => {
+      try {
+        deletingAllData.value = true
+        const res = await apiClient.delete('/api/books/all')
+        message.success(`Deleted ${res.data.books_deleted} books and ${res.data.readings_deleted} readings.`)
+      } catch (error) {
+        message.error(error.response?.data?.error || 'Failed to delete data')
+      } finally {
+        deletingAllData.value = false
+      }
     }
   })
 }

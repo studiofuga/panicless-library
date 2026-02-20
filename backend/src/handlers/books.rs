@@ -283,6 +283,27 @@ pub async fn get_book_readings(
     Ok(Json(readings))
 }
 
+pub async fn delete_all_books(
+    State(pool): State<DbPool>,
+    claims: Claims,
+) -> AppResult<Json<serde_json::Value>> {
+    let readings_result = sqlx::query("DELETE FROM readings WHERE user_id = $1")
+        .bind(claims.sub)
+        .execute(&pool)
+        .await?;
+
+    let books_result = sqlx::query("DELETE FROM books WHERE user_id = $1")
+        .bind(claims.sub)
+        .execute(&pool)
+        .await?;
+
+    Ok(Json(serde_json::json!({
+        "message": "All data deleted successfully",
+        "readings_deleted": readings_result.rows_affected(),
+        "books_deleted": books_result.rows_affected()
+    })))
+}
+
 pub async fn advanced_search_books(
     State(pool): State<DbPool>,
     Query(query): Query<AdvancedBookSearchQuery>,

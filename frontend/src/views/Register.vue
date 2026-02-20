@@ -76,7 +76,7 @@ const handleRegister = async () => {
     await authStore.regizster(data)
 
     message.success('Registration successful!')
-    router.push('/dashboard')
+    router.push('/statistics')
   } catch (error) {
     if (error.response) {
       if (error.response.status === 403) {

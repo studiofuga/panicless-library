@@ -1,7 +1,6 @@
 <template>
   <div>
-    <h1>Dashboard</h1>
-    <p v-if="currentUser">Welcome back, {{ currentUser.full_name || currentUser.username }}!</p>
+    <h1>Statistics</h1>
 
     <n-space vertical size="large">
       <!-- Statistics -->
@@ -29,31 +28,17 @@
           </n-list-item>
         </n-list>
       </n-card>
-
-      <!-- Quick Actions -->
-      <n-card title="Quick Actions">
-        <n-space>
-          <n-button type="primary" @click="$router.push('/books')">
-            Browse Books
-          </n-button>
-          <n-button type="primary" @click="$router.push('/readings')">
-            View Readings
-          </n-button>
-        </n-space>
-      </n-card>
     </n-space>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { useAuthStore } from '@/store/auth'
 import { useReadingsStore } from '@/store/readings'
 import { useMessage } from 'naive-ui'
 import {
   NCard,
   NSpace,
-  NButton,
   NStatistic,
   NSpin,
   NList,
@@ -61,11 +46,9 @@ import {
   NThing
 } from 'naive-ui'
 
-const authStore = useAuthStore()
 const readingsStore = useReadingsStore()
 const message = useMessage()
 
-const currentUser = computed(() => authStore.currentUser)
 const stats = computed(() => readingsStore.stats)
 const loadingStats = ref(false)
 

@@ -7,52 +7,78 @@
       </n-button>
     </n-space>
 
-    <!-- Search -->
-    <n-space style="margin-bottom: 24px;">
-      <n-input
-        v-model:value="searchQuery"
-        placeholder="Search books..."
-        @update:value="handleSearch"
-        clearable
-      />
-    </n-space>
+    <!-- Filters -->
+    <n-card size="small" style="margin-bottom: 16px;">
+      <n-space align="center" :wrap="true">
+        <n-input
+          v-model:value="filters.search"
+          placeholder="Search keyword..."
+          clearable
+          style="width: 200px;"
+          @update:value="handleFilterChange"
+        />
+        <n-input
+          v-model:value="filters.author"
+          placeholder="Author..."
+          clearable
+          style="width: 180px;"
+          @update:value="handleFilterChange"
+        />
+        <n-input-number
+          v-model:value="filters.publication_year"
+          placeholder="Year"
+          clearable
+          :min="1000"
+          :max="9999"
+          style="width: 140px;"
+          @update:value="handleFilterChange"
+        />
+        <n-popover trigger="click">
+          <template #trigger>
+            <n-button quaternary>Columns</n-button>
+          </template>
+          <n-checkbox-group v-model:value="visibleColumns">
+            <n-space vertical>
+              <n-checkbox value="title" label="Title" disabled />
+              <n-checkbox value="author" label="Author" />
+              <n-checkbox value="publication_year" label="Year" />
+              <n-checkbox value="pages" label="Pages" />
+              <n-checkbox value="publisher" label="Publisher" />
+              <n-checkbox value="isbn" label="ISBN" />
+              <n-checkbox value="language" label="Language" />
+            </n-space>
+          </n-checkbox-group>
+        </n-popover>
+        <n-button @click="clearFilters" quaternary>Clear filters</n-button>
+      </n-space>
+    </n-card>
 
-    <!-- Books List -->
+    <!-- Data Table -->
     <n-spin :show="loading">
       <n-empty v-if="books.length === 0 && !loading" description="No books found. Add your first book!" />
-      <div v-else>
-        <n-list hoverable clickable>
-          <n-list-item v-for="book in books" :key="book.id" @click="$router.push(`/books/${book.id}`)">
-            <n-thing>
-              <template #header>
-                {{ book.title }}
-              </template>
-              <template #description>
-                {{ book.author || 'Unknown Author' }}
-                <span v-if="book.publication_year"> ({{ book.publication_year }})</span>
-              </template>
-              <template #footer>
-                <n-space size="small">
-                  <n-tag v-if="book.isbn" size="small">ISBN: {{ book.isbn }}</n-tag>
-                  <n-tag v-if="book.publisher" size="small">{{ book.publisher }}</n-tag>
-                </n-space>
-              </template>
-            </n-thing>
-          </n-list-item>
-        </n-list>
-
-        <!-- Pagination -->
-        <n-space justify="center" style="margin-top: 24px;">
-          <n-pagination
-            :page="booksStore.currentPage"
-            :page-size="booksStore.pageSize"
-            :item-count="totalItems"
-            :on-update:page="handlePageChange"
-            @update:page-size="handlePageSizeChange"
-          />
-        </n-space>
-      </div>
+      <n-data-table
+        v-else
+        :columns="tableColumns"
+        :data="books"
+        :row-key="row => row.id"
+        :bordered="true"
+        :row-props="getRowProps"
+        :single-line="false"
+      />
     </n-spin>
+
+    <!-- Pagination -->
+    <n-space justify="center" style="margin-top: 16px;">
+      <n-pagination
+        :page="booksStore.currentPage"
+        :page-size="booksStore.pageSize"
+        :item-count="totalItems"
+        :page-sizes="[20, 50, 100]"
+        show-size-picker
+        @update:page="handlePageChange"
+        @update:page-size="handlePageSizeChange"
+      />
+    </n-space>
 
     <!-- Add Book Modal -->
     <n-modal v-model:show="showAddModal">
@@ -116,47 +142,44 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { useBooksStore } from '@/store/books'
 import { useMessage } from 'naive-ui'
 import {
   NSpace,
   NButton,
   NInput,
+  NInputNumber,
   NSpin,
   NEmpty,
-  NList,
-  NListItem,
-  NThing,
-  NTag,
   NModal,
   NCard,
   NForm,
   NFormItem,
-  NInputNumber,
   NGrid,
   NGridItem,
-  NPagination
+  NPagination,
+  NDataTable,
+  NPopover,
+  NCheckboxGroup,
+  NCheckbox
 } from 'naive-ui'
 
+const router = useRouter()
 const booksStore = useBooksStore()
 const message = useMessage()
 
 const books = computed(() => booksStore.books)
 const loading = computed(() => booksStore.loading)
 const totalItems = computed(() => {
-  // If we're on the last page and got less items than pageSize, we can calculate exact total
-  // Otherwise, we estimate based on full pages
   if (books.value.length < booksStore.pageSize) {
     return (booksStore.currentPage - 1) * booksStore.pageSize + books.value.length
   }
-  // For estimation: assume there's at least one more page
   return (booksStore.currentPage + 1) * booksStore.pageSize
 })
 
 const showAddModal = ref(false)
 const saving = ref(false)
-const searchQuery = ref('')
-const currentSearchQuery = ref('')
 const formRef = ref(null)
 const formValue = ref({
   title: '',
@@ -169,6 +192,71 @@ const formValue = ref({
   description: ''
 })
 
+// Filters
+const filters = ref({
+  search: '',
+  author: '',
+  publication_year: null
+})
+let debounceTimer = null
+
+const visibleColumns = ref(['title', 'author', 'publication_year', 'pages'])
+
+const allColumns = [
+  { title: 'Title', key: 'title', resizable: true, minWidth: 150 },
+  { title: 'Author', key: 'author', resizable: true, minWidth: 120 },
+  { title: 'Year', key: 'publication_year', width: 80 },
+  { title: 'Pages', key: 'pages', width: 80 },
+  { title: 'Publisher', key: 'publisher', resizable: true, minWidth: 120 },
+  { title: 'ISBN', key: 'isbn', width: 150 },
+  { title: 'Language', key: 'language', width: 100 }
+]
+
+const tableColumns = computed(() => {
+  return allColumns.filter(col => visibleColumns.value.includes(col.key))
+})
+
+const getRowProps = (row) => {
+  return {
+    style: 'cursor: pointer;',
+    onClick: () => {
+      router.push(`/books/${row.id}`)
+    }
+  }
+}
+
+const handleFilterChange = () => {
+  clearTimeout(debounceTimer)
+  debounceTimer = setTimeout(() => {
+    performSearch()
+  }, 400)
+}
+
+const performSearch = async () => {
+  try {
+    booksStore.setCurrentPage(1)
+    const params = {}
+    if (filters.value.search) params.title = filters.value.search
+    if (filters.value.author) params.author = filters.value.author
+    if (filters.value.publication_year) params.publication_year = filters.value.publication_year
+
+    const hasFilters = Object.keys(params).length > 0
+    if (hasFilters) {
+      await booksStore.advancedSearch(params)
+    } else {
+      await booksStore.fetchBooks()
+    }
+  } catch (error) {
+    message.error('Search failed')
+  }
+}
+
+const clearFilters = () => {
+  filters.value = { search: '', author: '', publication_year: null }
+  booksStore.setCurrentPage(1)
+  booksStore.fetchBooks()
+}
+
 onMounted(async () => {
   try {
     await booksStore.fetchBooks()
@@ -177,21 +265,15 @@ onMounted(async () => {
   }
 })
 
-const handleSearch = async () => {
-  try {
-    currentSearchQuery.value = searchQuery.value
-    booksStore.setCurrentPage(1) // Reset to first page on new search
-    await booksStore.fetchBooks({ search: searchQuery.value })
-  } catch (error) {
-    message.error('Search failed')
-  }
-}
-
 const handlePageChange = async (page) => {
   try {
     booksStore.setCurrentPage(page)
-    const params = currentSearchQuery.value ? { search: currentSearchQuery.value } : {}
-    await booksStore.fetchBooks(params)
+    const params = buildFilterParams()
+    if (Object.keys(params).length > 0) {
+      await booksStore.advancedSearch(params)
+    } else {
+      await booksStore.fetchBooks()
+    }
   } catch (error) {
     message.error('Failed to load page')
   }
@@ -200,18 +282,29 @@ const handlePageChange = async (page) => {
 const handlePageSizeChange = async (pageSize) => {
   try {
     booksStore.setPageSize(pageSize)
-    const params = currentSearchQuery.value ? { search: currentSearchQuery.value } : {}
-    await booksStore.fetchBooks(params)
+    const params = buildFilterParams()
+    if (Object.keys(params).length > 0) {
+      await booksStore.advancedSearch(params)
+    } else {
+      await booksStore.fetchBooks()
+    }
   } catch (error) {
     message.error('Failed to change page size')
   }
+}
+
+const buildFilterParams = () => {
+  const params = {}
+  if (filters.value.search) params.title = filters.value.search
+  if (filters.value.author) params.author = filters.value.author
+  if (filters.value.publication_year) params.publication_year = filters.value.publication_year
+  return params
 }
 
 const handleAddBook = async () => {
   try {
     saving.value = true
     const data = { ...formValue.value }
-    // Remove null/empty values
     Object.keys(data).forEach(key => {
       if (data[key] === null || data[key] === '') delete data[key]
     })
@@ -225,7 +318,6 @@ const handleAddBook = async () => {
     message.success('Book added successfully!')
     showAddModal.value = false
 
-    // Reset form
     formValue.value = {
       title: '',
       author: '',
@@ -237,9 +329,7 @@ const handleAddBook = async () => {
       description: ''
     }
 
-    // Reload books list (reset to first page and clear search)
-    searchQuery.value = ''
-    currentSearchQuery.value = ''
+    filters.value = { search: '', author: '', publication_year: null }
     booksStore.setCurrentPage(1)
     await booksStore.fetchBooks()
   } catch (error) {

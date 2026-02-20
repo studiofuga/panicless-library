@@ -67,7 +67,7 @@ const handleLogin = async () => {
 
     message.success('Login successful!')
 
-    const redirect = route.query.redirect || '/dashboard'
+    const redirect = route.query.redirect || '/statistics'
     router.push(redirect)
   } catch (error) {
     if (error.response) {

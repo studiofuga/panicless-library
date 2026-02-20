@@ -82,7 +82,7 @@ const handleComplete = async () => {
     await authStore.completeRegistration(data)
 
     message.success('Registration completed successfully!')
-    router.push('/dashboard')
+    router.push('/statistics')
   } catch (error) {
     if (error.response) {
       message.error(error.response.data.message || 'Registration failed')

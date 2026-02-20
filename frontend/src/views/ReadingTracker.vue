@@ -4,12 +4,20 @@
       <h1>Reading Tracker</h1>
     </n-space>
 
-    <!-- Filter -->
-    <n-space style="margin-bottom: 24px;">
+    <!-- Filters -->
+    <n-space style="margin-bottom: 24px;" align="center">
       <n-select
         v-model:value="statusFilter"
         :options="statusOptions"
         style="width: 200px"
+        @update:value="handleFilterChange"
+      />
+      <n-select
+        v-model:value="yearFilter"
+        :options="yearOptions"
+        clearable
+        placeholder="Filter by year"
+        style="width: 160px"
         @update:value="handleFilterChange"
       />
     </n-space>
@@ -163,6 +171,13 @@ const statusOptions = [
 ]
 const currentStatusFilter = ref('all')
 
+const yearFilter = ref(null)
+const currentYear = new Date().getFullYear()
+const yearOptions = Array.from({ length: 21 }, (_, i) => {
+  const y = currentYear - i
+  return { label: String(y), value: y }
+})
+
 const showCompleteModal = ref(false)
 const selectedReading = ref(null)
 const completeData = ref({
@@ -178,12 +193,18 @@ onMounted(async () => {
   }
 })
 
+const buildFilterParams = () => {
+  const params = {}
+  if (statusFilter.value !== 'all') params.status = statusFilter.value
+  if (yearFilter.value) params.year = yearFilter.value
+  return params
+}
+
 const handleFilterChange = async () => {
   try {
     currentStatusFilter.value = statusFilter.value
-    readingsStore.setCurrentPage(1) // Reset to first page on filter change
-    const params = statusFilter.value === 'all' ? {} : { status: statusFilter.value }
-    await readingsStore.fetchReadings(params)
+    readingsStore.setCurrentPage(1)
+    await readingsStore.fetchReadings(buildFilterParams())
   } catch (error) {
     message.error('Failed to filter readings')
   }
@@ -192,8 +213,7 @@ const handleFilterChange = async () => {
 const handlePageChange = async (page) => {
   try {
     readingsStore.setCurrentPage(page)
-    const params = currentStatusFilter.value === 'all' ? {} : { status: currentStatusFilter.value }
-    await readingsStore.fetchReadings(params)
+    await readingsStore.fetchReadings(buildFilterParams())
   } catch (error) {
     message.error('Failed to load page')
   }
@@ -202,8 +222,7 @@ const handlePageChange = async (page) => {
 const handlePageSizeChange = async (pageSize) => {
   try {
     readingsStore.setPageSize(pageSize)
-    const params = currentStatusFilter.value === 'all' ? {} : { status: currentStatusFilter.value }
-    await readingsStore.fetchReadings(params)
+    await readingsStore.fetchReadings(buildFilterParams())
   } catch (error) {
     message.error('Failed to change page size')
   }
@@ -232,9 +251,8 @@ const handleSaveComplete = async () => {
     })
     message.success('Reading completed!')
     showCompleteModal.value = false
-    readingsStore.setCurrentPage(1) // Reset to first page
-    const params = statusFilter.value === 'all' ? {} : { status: statusFilter.value }
-    await readingsStore.fetchReadings(params)
+    readingsStore.setCurrentPage(1)
+    await readingsStore.fetchReadings(buildFilterParams())
   } catch (error) {
     message.error('Failed to complete reading')
   }
@@ -251,8 +269,7 @@ const handleDeleteReading = (id) => {
         await readingsStore.deleteReading(id)
         message.success('Reading deleted')
         // Reload readings to reflect the deletion
-        const params = statusFilter.value === 'all' ? {} : { status: statusFilter.value }
-        await readingsStore.fetchReadings(params)
+        await readingsStore.fetchReadings(buildFilterParams())
       } catch (error) {
         message.error('Failed to delete reading')
       }
