@@ -73,13 +73,17 @@ const handleRegister = async () => {
     const data = { ...formValue.value }
     if (!data.full_name) delete data.full_name
 
-    await authStore.register(data)
+    await authStore.regizster(data)
 
     message.success('Registration successful!')
     router.push('/dashboard')
   } catch (error) {
     if (error.response) {
-      message.error(error.response.data.message || 'Registration failed')
+      if (error.response.status === 403) {
+        message.error('Registration is closed. Contact an admin for an invitation.', { duration: 5000 })
+      } else {
+        message.error(error.response.data.message || 'Registration failed')
+      }
     } else if (error.errors) {
       return
     } else {

@@ -17,6 +17,7 @@
                     <n-button text tag="a" @click="$router.push('/books')">Books</n-button>
                     <n-button text tag="a" @click="$router.push('/readings')">Readings</n-button>
                     <n-button text tag="a" @click="$router.push('/import')">Import</n-button>
+                    <n-button v-if="isAdmin" text tag="a" @click="$router.push('/admin/users')">Admin</n-button>
                     <n-button text tag="a" @click="$router.push('/settings')">⚙️ Settings</n-button>
                     <n-button text tag="a" @click="handleLogout">Logout</n-button>
                   </n-space>
@@ -38,8 +39,8 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
 import { useRouter } from 'vue-router'
+import { storeToRefs } from 'pinia'
 import { useAuthStore } from '@/store/auth'
 import {
   NConfigProvider,
@@ -56,7 +57,7 @@ import {
 const authStore = useAuthStore()
 const router = useRouter()
 
-const isAuthenticated = computed(() => authStore.isAuthenticated)
+const { isAuthenticated, isAdmin } = storeToRefs(authStore)
 
 const handleLogout = () => {
   authStore.logout()

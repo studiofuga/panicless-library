@@ -11,6 +11,7 @@ export const useAuthStore = defineStore('auth', () => {
   // Getters
   const isAuthenticated = computed(() => !!accessToken.value)
   const currentUser = computed(() => user.value)
+  const isAdmin = computed(() => user.value?.role?.toLowerCase() === 'admin')
 
   // Actions
   async function register(userData) {
@@ -51,6 +52,20 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  async function changePassword(currentPassword, newPassword) {
+    const response = await apiClient.post('/api/auth/change-password', {
+      current_password: currentPassword,
+      new_password: newPassword
+    })
+    return response.data
+  }
+
+  async function completeRegistration(data) {
+    const response = await apiClient.post('/api/auth/complete-registration', data)
+    setAuthData(response.data)
+    return response.data
+  }
+
   function setAuthData(data) {
     accessToken.value = data.access_token
     refreshTokenValue.value = data.refresh_token
@@ -79,10 +94,13 @@ export const useAuthStore = defineStore('auth', () => {
     accessToken,
     isAuthenticated,
     currentUser,
+    isAdmin,
     register,
     login,
     refreshToken,
     fetchCurrentUser,
+    changePassword,
+    completeRegistration,
     logout
   }
 })

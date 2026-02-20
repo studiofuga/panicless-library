@@ -21,6 +21,12 @@ const routes = [
     meta: { guest: true }
   },
   {
+    path: '/complete-registration',
+    name: 'CompleteRegistration',
+    component: () => import('@/views/CompleteRegistration.vue'),
+    meta: { guest: true }
+  },
+  {
     path: '/dashboard',
     name: 'Dashboard',
     component: () => import('@/views/Dashboard.vue'),
@@ -61,6 +67,12 @@ const routes = [
     name: 'Authorize',
     component: () => import('@/views/Authorize.vue'),
     meta: { requiresAuth: true }
+  },
+  {
+    path: '/admin/users',
+    name: 'AdminUsers',
+    component: () => import('@/views/AdminUsers.vue'),
+    meta: { requiresAuth: true, requiresAdmin: true }
   }
 ]
 
@@ -76,6 +88,9 @@ router.beforeEach((to, from, next) => {
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
     // Protected route, user not authenticated
     next({ name: 'Login', query: { redirect: to.fullPath } })
+  } else if (to.meta.requiresAdmin && !authStore.isAdmin) {
+    // Admin route, user not admin
+    next({ name: 'Dashboard' })
   } else if (to.meta.guest && authStore.isAuthenticated) {
     // Guest route (login/register), user already authenticated
     next({ name: 'Dashboard' })

@@ -25,6 +25,16 @@
                   <n-descriptions-item label="Full Name">
                     {{ currentUser?.full_name || 'Not set' }}
                   </n-descriptions-item>
+                  <n-descriptions-item label="Role">
+                    <n-tag :type="currentUser?.role?.toLowerCase() === 'admin' ? 'warning' : 'info'" size="small">
+                      {{ currentUser?.role }}
+                    </n-tag>
+                  </n-descriptions-item>
+                  <n-descriptions-item label="Status">
+                    <n-tag :type="currentUser?.enabled ? 'success' : 'error'" size="small">
+                      {{ currentUser?.enabled ? 'Active' : 'Disabled' }}
+                    </n-tag>
+                  </n-descriptions-item>
                   <n-descriptions-item label="Joined">
                     {{ formatDate(currentUser?.created_at) }}
                   </n-descriptions-item>
@@ -40,6 +50,26 @@
                     Logout
                   </n-button>
                 </n-space>
+              </div>
+
+              <n-divider />
+
+              <div>
+                <h3 style="margin: 0 0 16px 0">Change Password</h3>
+                <n-form ref="passwordFormRef" :model="passwordForm" :rules="passwordRules" style="max-width: 400px;">
+                  <n-form-item label="Current Password" path="current_password">
+                    <n-input v-model:value="passwordForm.current_password" type="password" placeholder="Enter current password" />
+                  </n-form-item>
+                  <n-form-item label="New Password" path="new_password">
+                    <n-input v-model:value="passwordForm.new_password" type="password" placeholder="Enter new password (min 8 characters)" />
+                  </n-form-item>
+                  <n-form-item label="Confirm New Password" path="confirm_new_password">
+                    <n-input v-model:value="passwordForm.confirm_new_password" type="password" placeholder="Confirm new password" />
+                  </n-form-item>
+                  <n-button type="primary" :loading="changingPassword" @click="handleChangePassword">
+                    Change Password
+                  </n-button>
+                </n-form>
               </div>
             </n-space>
           </div>
@@ -124,7 +154,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useMessage } from 'naive-ui'
 import { useAuthStore } from '@/store/auth'
@@ -140,6 +170,53 @@ const connectorsStore = useConnectorsStore()
 // Computed
 const currentUser = computed(() => authStore.user)
 const activeConnectors = computed(() => connectorsStore.activeConnectors)
+
+// Change password
+const passwordFormRef = ref(null)
+const changingPassword = ref(false)
+const passwordForm = ref({
+  current_password: '',
+  new_password: '',
+  confirm_new_password: ''
+})
+
+const passwordRules = {
+  current_password: [
+    { required: true, message: 'Current password is required', trigger: 'blur' }
+  ],
+  new_password: [
+    { required: true, message: 'New password is required', trigger: 'blur' },
+    { min: 8, message: 'Password must be at least 8 characters', trigger: 'blur' }
+  ],
+  confirm_new_password: [
+    { required: true, message: 'Please confirm your new password', trigger: 'blur' },
+    {
+      validator: (rule, value) => value === passwordForm.value.new_password,
+      message: 'Passwords do not match',
+      trigger: 'blur'
+    }
+  ]
+}
+
+const handleChangePassword = async () => {
+  try {
+    await passwordFormRef.value?.validate()
+    changingPassword.value = true
+    await authStore.changePassword(passwordForm.value.current_password, passwordForm.value.new_password)
+    message.success('Password changed successfully')
+    passwordForm.value = { current_password: '', new_password: '', confirm_new_password: '' }
+  } catch (error) {
+    if (error.response) {
+      message.error(error.response.data.message || 'Failed to change password')
+    } else if (error.errors) {
+      return
+    } else {
+      message.error('Failed to change password')
+    }
+  } finally {
+    changingPassword.value = false
+  }
+}
 
 // Helpers
 const formatDate = (dateString) => {
