@@ -17,7 +17,7 @@ use crate::{
     config::Config,
     db::DbPool,
     handlers,
-    middleware::auth::auth_middleware,
+    middleware::auth::{auth_middleware, require_admin_middleware},
 };
 
 #[derive(Clone)]
@@ -49,7 +49,8 @@ pub fn create_router(pool: DbPool, config: Config) -> Router {
 
     // Public routes (no authentication required)
     let public_routes = Router::new()
-        .route("/api/auth/register", post(handlers::register))
+        .route("/api/auth/register", post(handlers::bootstrap_register))
+        .route("/api/auth/complete-registration", post(handlers::complete_registration))
         .route("/api/auth/login", post(handlers::login))
         .route("/api/auth/refresh", post(handlers::refresh))
         // OAuth2 token endpoint (no auth required, uses client credentials)
@@ -58,16 +59,25 @@ pub fn create_router(pool: DbPool, config: Config) -> Router {
         .route("/.well-known/oauth-authorization-server", get(handlers::authorization_server_metadata))
         .route("/.well-known/oauth-protected-resource", get(handlers::protected_resource_metadata));
 
+    // Admin routes (authentication + admin role required)
+    let admin_routes = Router::new()
+        .route("/api/admin/users", get(handlers::admin_list_users))
+        .route("/api/admin/users", post(handlers::admin_create_user))
+        .route("/api/admin/users/:id", get(handlers::admin_get_user))
+        .route("/api/admin/users/:id", put(handlers::admin_update_user))
+        .route("/api/admin/users/:id", delete(handlers::admin_delete_user))
+        .route("/api/admin/users/:id/resend-invitation", post(handlers::admin_resend_invitation))
+        .layer(middleware::from_fn(require_admin_middleware));
+
     // Protected routes (authentication required)
     let protected_routes = Router::new()
         // Auth
         .route("/api/auth/me", get(handlers::get_current_user))
+        .route("/api/auth/change-password", post(handlers::change_password))
         // OAuth2 authorize endpoint (requires authentication)
         .route("/oauth/authorize", post(handlers::authorize))
         // Users
         .route("/api/users/:id", get(handlers::get_user))
-        .route("/api/users/:id", put(handlers::update_user))
-        .route("/api/users/:id", delete(handlers::delete_user))
         // Books
         .route("/api/books", get(handlers::list_books))
         .route("/api/books/search/advanced", get(handlers::advanced_search_books))
@@ -95,7 +105,9 @@ pub fn create_router(pool: DbPool, config: Config) -> Router {
         // MCP endpoints (HTTP/SSE for remote access)
         .route("/mcp", get(handlers::handle_mcp_sse))
         .route("/mcp", post(handlers::handle_mcp_sse_post))
-        // Apply authentication middleware to all protected routes
+        // Merge admin routes (they already have the admin middleware layer)
+        .merge(admin_routes)
+        // Apply authentication middleware to all protected routes (including admin)
         .layer(middleware::from_fn_with_state(
             state.clone(),
             auth_middleware,
@@ -185,4 +197,3 @@ async fn fallback_handler(uri: axum::http::Uri) -> impl IntoResponse {
     )
         .into_response()
 }
-

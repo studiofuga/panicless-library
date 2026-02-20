@@ -15,31 +15,54 @@ use crate::{config::Config, errors::{AppError, AppResult}, db::DbPool};
 pub struct Claims {
     pub sub: i32,           // Subject (user_id)
     pub username: String,   // Username
+    pub role: String,       // "admin" or "user"
     pub exp: usize,         // Expiration time
     pub iat: usize,         // Issued at
     pub token_type: String, // "access" or "refresh"
 }
 
 impl Claims {
-    pub fn new_access_token(user_id: i32, username: String, expiry: i64) -> Self {
+    pub fn new_access_token(user_id: i32, username: String, role: String, expiry: i64) -> Self {
         let now = chrono::Utc::now().timestamp() as usize;
         Self {
             sub: user_id,
             username,
+            role,
             exp: (now as i64 + expiry) as usize,
             iat: now,
             token_type: "access".to_string(),
         }
     }
 
-    pub fn new_refresh_token(user_id: i32, username: String, expiry: i64) -> Self {
+    pub fn new_refresh_token(user_id: i32, username: String, role: String, expiry: i64) -> Self {
         let now = chrono::Utc::now().timestamp() as usize;
         Self {
             sub: user_id,
             username,
+            role,
             exp: (now as i64 + expiry) as usize,
             iat: now,
             token_type: "refresh".to_string(),
+        }
+    }
+
+    pub fn is_admin(&self) -> bool {
+        self.role == "admin"
+    }
+
+    pub fn require_admin(&self) -> AppResult<()> {
+        if self.is_admin() {
+            Ok(())
+        } else {
+            Err(AppError::Authorization("Admin access required".to_string()))
+        }
+    }
+
+    pub fn require_admin_or_self(&self, user_id: i32) -> AppResult<()> {
+        if self.is_admin() || self.sub == user_id {
+            Ok(())
+        } else {
+            Err(AppError::Authorization("Access denied".to_string()))
         }
     }
 }
@@ -115,6 +138,24 @@ pub async fn auth_middleware(
     Ok(next.run(request).await)
 }
 
+/// Middleware that requires the authenticated user to have admin role.
+/// Must be applied AFTER auth_middleware so that Claims are available.
+pub async fn require_admin_middleware(
+    request: Request,
+    next: Next,
+) -> Result<Response, AppError> {
+    let claims = request
+        .extensions()
+        .get::<Claims>()
+        .ok_or_else(|| AppError::Authentication("No claims found".to_string()))?;
+
+    if !claims.is_admin() {
+        return Err(AppError::Authorization("Admin access required".to_string()));
+    }
+
+    Ok(next.run(request).await)
+}
+
 /// Verify OAuth access token by looking it up in the database
 async fn verify_oauth_token(pool: &PgPool, token: &str) -> AppResult<Claims> {
     // Look up token in database
@@ -134,13 +175,14 @@ async fn verify_oauth_token(pool: &PgPool, token: &str) -> AppResult<Claims> {
         return Err(AppError::Authentication("OAuth token expired".to_string()));
     }
 
-    // Get user info
-    let user = sqlx::query("SELECT username FROM users WHERE id = $1")
+    // Get user info including role
+    let user = sqlx::query("SELECT username, role::text FROM users WHERE id = $1")
         .bind(user_id)
         .fetch_one(pool)
         .await?;
 
     let username: String = user.get("username");
+    let role: String = user.get("role");
 
     // Create claims from OAuth token
     let exp = expires_at.timestamp() as usize;
@@ -149,6 +191,7 @@ async fn verify_oauth_token(pool: &PgPool, token: &str) -> AppResult<Claims> {
     Ok(Claims {
         sub: user_id,
         username,
+        role,
         exp,
         iat: now,
         token_type: "access".to_string(),

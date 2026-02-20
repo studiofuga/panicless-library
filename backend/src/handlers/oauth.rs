@@ -264,13 +264,14 @@ pub async fn token(
 
     // Get user info for JWT
     let user = sqlx::query(
-        "SELECT id, username FROM users WHERE id = $1"
+        "SELECT id, username, role::text FROM users WHERE id = $1"
     )
     .bind(user_id)
     .fetch_one(&pool)
     .await?;
 
     let username: String = user.get("username");
+    let role: String = user.get("role");
 
     // Generate access token
     let access_token = generate_token();
@@ -297,6 +298,7 @@ pub async fn token(
     let claims = Claims {
         sub: user_id,
         username,
+        role,
         exp,
         iat,
         token_type: "access".to_string(),
