@@ -116,6 +116,9 @@ pub fn create_router(pool: DbPool, config: Config) -> Router {
     // Public metadata endpoints (no auth required)
     let public_metadata_routes = Router::new()
         .route("/health", get(|| async { "OK" }))
+        .route("/api/version", get(|| async {
+            axum::Json(serde_json::json!({ "version": env!("CARGO_PKG_VERSION") }))
+        }))
         .route("/openapi.json", get(handlers::openapi_schema));
 
     // Create trace layer for request/response logging

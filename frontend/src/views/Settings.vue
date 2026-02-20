@@ -71,6 +71,21 @@
                   </n-button>
                 </n-form>
               </div>
+
+              <n-divider />
+
+              <div>
+                <h3 style="margin: 0 0 16px 0">Version Info</h3>
+                <n-descriptions :columns="1" border>
+                  <n-descriptions-item label="Frontend">
+                    {{ frontendVersion }}
+                  </n-descriptions-item>
+                  <n-descriptions-item label="Backend">
+                    <n-spin v-if="loadingBackendVersion" :size="16" />
+                    <template v-else>{{ backendVersion }}</template>
+                  </n-descriptions-item>
+                </n-descriptions>
+              </div>
             </n-space>
           </div>
         </n-tab-pane>
@@ -161,11 +176,17 @@ import { useAuthStore } from '@/store/auth'
 import { useConnectorsStore } from '@/store/connectors'
 import { formatDistanceToNow } from 'date-fns'
 import ConnectorCard from '@/components/connectors/ConnectorCard.vue'
+import apiClient from '@/api/client'
 
 const router = useRouter()
 const message = useMessage()
 const authStore = useAuthStore()
 const connectorsStore = useConnectorsStore()
+
+// Version info
+const frontendVersion = __APP_VERSION__
+const backendVersion = ref('...')
+const loadingBackendVersion = ref(true)
 
 // Computed
 const currentUser = computed(() => authStore.user)
@@ -285,6 +306,15 @@ onMounted(async () => {
     await connectorsStore.fetchConnectors()
   } catch (error) {
     message.error('Failed to load connectors')
+  }
+
+  try {
+    const res = await apiClient.get('/api/version')
+    backendVersion.value = res.data.version
+  } catch {
+    backendVersion.value = 'N/A'
+  } finally {
+    loadingBackendVersion.value = false
   }
 })
 </script>
