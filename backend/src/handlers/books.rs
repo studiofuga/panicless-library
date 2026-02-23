@@ -304,6 +304,62 @@ pub async fn delete_all_books(
     })))
 }
 
+pub async fn list_unread_books(
+    State(pool): State<DbPool>,
+    Query(query): Query<BookQuery>,
+    claims: Claims,
+) -> AppResult<Json<Vec<Book>>> {
+
+    let page = query.page.unwrap_or(1);
+    let limit = query.limit.unwrap_or(20);
+    let offset = (page - 1) * limit;
+
+    let mut sql = String::from(
+        "SELECT b.id, b.user_id, b.title, b.author, b.edition, b.isbn, b.publication_year, b.publisher, b.pages, b.language, b.description, b.cover_image_url, b.created_at, b.updated_at FROM books b WHERE b.user_id = $1 AND NOT EXISTS (SELECT 1 FROM readings r WHERE r.book_id = b.id)"
+    );
+
+    let mut param_count = 2;
+
+    if query.search.is_some() {
+        sql.push_str(&format!(" AND (b.title ILIKE ${} OR b.author ILIKE ${})", param_count, param_count));
+        param_count += 1;
+    }
+
+    if query.author.is_some() {
+        sql.push_str(&format!(" AND b.author ILIKE ${}", param_count));
+        param_count += 1;
+    }
+
+    if query.year.is_some() {
+        sql.push_str(&format!(" AND b.publication_year = ${}", param_count));
+        param_count += 1;
+    }
+
+    sql.push_str(&format!(" ORDER BY b.title LIMIT ${} OFFSET ${}", param_count, param_count + 1));
+
+    let mut query_builder = sqlx::query_as::<_, Book>(&sql).bind(claims.sub);
+
+    if let Some(search) = query.search {
+        let search_pattern = format!("%{}%", search);
+        query_builder = query_builder.bind(search_pattern);
+    }
+
+    if let Some(author) = query.author {
+        let author_pattern = format!("%{}%", author);
+        query_builder = query_builder.bind(author_pattern);
+    }
+
+    if let Some(year) = query.year {
+        query_builder = query_builder.bind(year);
+    }
+
+    query_builder = query_builder.bind(limit).bind(offset);
+
+    let books = query_builder.fetch_all(&pool).await?;
+
+    Ok(Json(books))
+}
+
 pub async fn advanced_search_books(
     State(pool): State<DbPool>,
     Query(query): Query<AdvancedBookSearchQuery>,

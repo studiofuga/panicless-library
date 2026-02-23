@@ -81,6 +81,7 @@ pub fn create_router(pool: DbPool, config: Config) -> Router {
         // Books
         .route("/api/books", get(handlers::list_books))
         .route("/api/books/search/advanced", get(handlers::advanced_search_books))
+        .route("/api/books/unread", get(handlers::list_unread_books))
         .route("/api/books", post(handlers::create_book))
         .route("/api/books/:id", get(handlers::get_book))
         .route("/api/books/:id", put(handlers::update_book))

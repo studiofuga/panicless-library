@@ -4,12 +4,16 @@ import apiClient from '@/api/client'
 
 export const useBooksStore = defineStore('books', () => {
   const books = ref([])
+  const unreadBooks = ref([])
   const currentBook = ref(null)
   const loading = ref(false)
   const error = ref(null)
   const currentPage = ref(1)
   const pageSize = ref(20)
   const totalBooks = ref(0)
+  const unreadCurrentPage = ref(1)
+  const unreadPageSize = ref(20)
+  const totalUnreadBooks = ref(0)
 
   async function fetchBooks(params = {}) {
     loading.value = true
@@ -45,6 +49,42 @@ export const useBooksStore = defineStore('books', () => {
   function setPageSize(size) {
     pageSize.value = size
     currentPage.value = 1 // Reset to first page when changing page size
+  }
+
+  async function fetchUnreadBooks(params = {}) {
+    loading.value = true
+    error.value = null
+    try {
+      const requestParams = {
+        page: unreadCurrentPage.value,
+        limit: unreadPageSize.value,
+        ...params
+      }
+      const response = await apiClient.get('/api/books/unread', { params: requestParams })
+      unreadBooks.value = response.data
+
+      if (response.data.length < unreadPageSize.value) {
+        totalUnreadBooks.value = (unreadCurrentPage.value - 1) * unreadPageSize.value + response.data.length
+      } else {
+        totalUnreadBooks.value = (unreadCurrentPage.value + 1) * unreadPageSize.value
+      }
+
+      return response.data
+    } catch (err) {
+      error.value = err.response?.data?.message || 'Failed to fetch unread books'
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  function setUnreadCurrentPage(page) {
+    unreadCurrentPage.value = page
+  }
+
+  function setUnreadPageSize(size) {
+    unreadPageSize.value = size
+    unreadCurrentPage.value = 1
   }
 
   async function advancedSearch(filters = {}) {
@@ -159,13 +199,18 @@ export const useBooksStore = defineStore('books', () => {
 
   return {
     books,
+    unreadBooks,
     currentBook,
     loading,
     error,
     currentPage,
     pageSize,
     totalBooks,
+    unreadCurrentPage,
+    unreadPageSize,
+    totalUnreadBooks,
     fetchBooks,
+    fetchUnreadBooks,
     fetchBook,
     createBook,
     updateBook,
@@ -173,6 +218,8 @@ export const useBooksStore = defineStore('books', () => {
     importGoodreadsCSV,
     setCurrentPage,
     setPageSize,
+    setUnreadCurrentPage,
+    setUnreadPageSize,
     advancedSearch
   }
 })
