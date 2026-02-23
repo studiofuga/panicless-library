@@ -14,6 +14,7 @@ pub struct Config {
     pub oauth_client_id: String,
     pub oauth_client_secret: String,
     pub public_base_url: Option<String>,
+    pub auto_migrate: bool,
 }
 
 impl Config {
@@ -61,6 +62,11 @@ impl Config {
 
         let public_base_url = env::var("PUBLIC_BASE_URL").ok();
 
+        let auto_migrate = env::var("AUTO_MIGRATE")
+            .unwrap_or_else(|_| "true".to_string())
+            .parse::<bool>()
+            .unwrap_or(true);
+
         Ok(Config {
             database_url,
             jwt_secret,
@@ -74,6 +80,7 @@ impl Config {
             oauth_client_id,
             oauth_client_secret,
             public_base_url,
+            auto_migrate,
         })
     }
 

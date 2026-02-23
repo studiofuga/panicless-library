@@ -28,6 +28,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     panicless_backend::db::test_connection(&pool).await?;
     tracing::info!("Database connection test successful");
 
+    // Run database migrations
+    if config.auto_migrate {
+        panicless_backend::db::run_migrations(&pool).await?;
+    } else {
+        tracing::info!("Auto-migration disabled, skipping");
+    }
+
     // Create router
     let app = create_router(pool, config.clone());
     tracing::info!("Router created with all endpoints");

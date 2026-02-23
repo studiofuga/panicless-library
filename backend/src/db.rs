@@ -20,9 +20,9 @@ pub async fn create_pool(database_url: &str) -> Result<DbPool, sqlx::Error> {
 pub async fn run_migrations(pool: &DbPool) -> Result<(), sqlx::Error> {
     tracing::info!("Running database migrations");
 
-    // Note: sqlx::migrate! macro looks for migrations in the migrations/ directory
-    // For now, we're using manual SQL files in the database/ directory
-    // If you want to use sqlx migrations, copy them to backend/migrations/
+    sqlx::migrate!("../database/migrations")
+        .run(pool)
+        .await?;
 
     tracing::info!("Migrations completed successfully");
 

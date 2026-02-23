@@ -20,15 +20,20 @@ CREATE INDEX IF NOT EXISTS idx_connectors_provider ON connectors(provider);
 CREATE INDEX IF NOT EXISTS idx_connectors_user_provider ON connectors(user_id, provider);
 
 -- Create trigger to automatically update updated_at timestamp
+DROP TRIGGER IF EXISTS update_connectors_updated_at ON connectors;
 CREATE TRIGGER update_connectors_updated_at
     BEFORE UPDATE ON connectors
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
 -- Add validation for provider enum
-ALTER TABLE connectors
-    ADD CONSTRAINT check_provider_type
-    CHECK (provider IN ('anthropic', 'gemini', 'chatgpt'));
+DO $$ BEGIN
+    ALTER TABLE connectors
+        ADD CONSTRAINT check_provider_type
+        CHECK (provider IN ('anthropic', 'gemini', 'chatgpt'));
+EXCEPTION
+    WHEN duplicate_object THEN NULL;
+END $$;
 
 -- Add comments for documentation
 COMMENT ON TABLE connectors IS 'Stores encrypted API tokens for AI provider integrations';

@@ -26,6 +26,7 @@ CREATE INDEX IF NOT EXISTS idx_books_isbn ON books(isbn);
 CREATE INDEX IF NOT EXISTS idx_books_publication_year ON books(publication_year);
 
 -- Create trigger to automatically update updated_at timestamp
+DROP TRIGGER IF EXISTS update_books_updated_at ON books;
 CREATE TRIGGER update_books_updated_at
     BEFORE UPDATE ON books
     FOR EACH ROW

@@ -11,8 +11,8 @@ CREATE TABLE IF NOT EXISTS oauth_codes (
     used_at TIMESTAMP WITH TIME ZONE NULL
 );
 
-CREATE INDEX idx_oauth_codes_code ON oauth_codes(code);
-CREATE INDEX idx_oauth_codes_expires_at ON oauth_codes(expires_at);
+CREATE INDEX IF NOT EXISTS idx_oauth_codes_code ON oauth_codes(code);
+CREATE INDEX IF NOT EXISTS idx_oauth_codes_expires_at ON oauth_codes(expires_at);
 
 -- OAuth2 Access Tokens Table (for tracking issued tokens)
 CREATE TABLE IF NOT EXISTS oauth_tokens (
@@ -27,6 +27,6 @@ CREATE TABLE IF NOT EXISTS oauth_tokens (
     revoked_at TIMESTAMP WITH TIME ZONE NULL
 );
 
-CREATE INDEX idx_oauth_tokens_token ON oauth_tokens(token);
-CREATE INDEX idx_oauth_tokens_user_id ON oauth_tokens(user_id);
-CREATE INDEX idx_oauth_tokens_expires_at ON oauth_tokens(expires_at);
+CREATE INDEX IF NOT EXISTS idx_oauth_tokens_token ON oauth_tokens(token);
+CREATE INDEX IF NOT EXISTS idx_oauth_tokens_user_id ON oauth_tokens(user_id);
+CREATE INDEX IF NOT EXISTS idx_oauth_tokens_expires_at ON oauth_tokens(expires_at);

@@ -9,6 +9,6 @@ pub mod routes;
 pub mod services;
 
 pub use config::Config;
-pub use db::{create_pool, DbPool};
+pub use db::{create_pool, run_migrations, DbPool};
 pub use errors::{AppError, AppResult};
 pub use routes::create_router;

@@ -30,6 +30,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_readings_no_overlap
     WHERE end_date IS NULL;
 
 -- Create trigger to automatically update updated_at timestamp
+DROP TRIGGER IF EXISTS update_readings_updated_at ON readings;
 CREATE TRIGGER update_readings_updated_at
     BEFORE UPDATE ON readings
     FOR EACH ROW
@@ -53,6 +54,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Create trigger to validate ownership before INSERT or UPDATE
+DROP TRIGGER IF EXISTS validate_reading_ownership_trigger ON readings;
 CREATE TRIGGER validate_reading_ownership_trigger
     BEFORE INSERT OR UPDATE ON readings
     FOR EACH ROW
