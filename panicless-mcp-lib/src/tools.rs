@@ -7,6 +7,15 @@ use crate::queries;
 pub fn get_tool_definitions() -> Vec<ToolDefinition> {
     vec![
         ToolDefinition {
+            name: "get_today".to_string(),
+            description: "Get today's date, current time (UTC), and day of the week. Call this before creating readings or filtering by date to know the current date. The day_of_week field returns the English name (e.g. Monday, Tuesday).".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {},
+                "required": []
+            }),
+        },
+        ToolDefinition {
             name: "search_books".to_string(),
             description: "Search books in user's library by title, author, or year with pagination support".to_string(),
             input_schema: json!({
@@ -283,6 +292,7 @@ pub async fn execute_tool(
     let args = arguments.unwrap_or(serde_json::json!({}));
 
     match name {
+        "get_today" => Ok(get_today()),
         "search_books" => search_books(pool, args, user_id).await,
         "advanced_search_books" => advanced_search_books(pool, args, user_id).await,
         "get_book_details" => get_book_details(pool, args, user_id).await,
@@ -293,6 +303,20 @@ pub async fn execute_tool(
         "create_reading" => create_reading(pool, args, user_id).await,
         "update_reading_review" => update_reading_review(pool, args, user_id).await,
         _ => Err(format!("Unknown tool: {}", name)),
+    }
+}
+
+fn get_today() -> ToolCallResult {
+    let now = chrono::Utc::now();
+    let text = format!(
+        "Today's date: {}\nCurrent time (UTC): {}\nDay of the week: {}",
+        now.format("%Y-%m-%d"),
+        now.format("%H:%M:%S"),
+        now.format("%A"),
+    );
+    ToolCallResult {
+        content: vec![ContentItem::Text { text }],
+        is_error: None,
     }
 }
 
