@@ -33,6 +33,7 @@ COPY panicless-mcp-lib ./panicless-mcp-lib
 COPY mcp-server ./mcp-server
 COPY mcp-oauth ./mcp-oauth
 COPY backend ./backend
+COPY database ./database
 
 # Build the backend application in release mode
 RUN cargo build --release --package panicless-backend
