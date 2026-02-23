@@ -26,6 +26,7 @@ services:
       dockerfile: backend/Dockerfile
       args:
         VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8080}
+    image: europe-west8-docker.pkg.dev/studiofuga-477717/docker/panicless-backend:latest
     container_name: panicless-backend
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-panicless}
