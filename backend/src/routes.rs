@@ -121,7 +121,8 @@ pub fn create_router(pool: DbPool, config: Config) -> Router {
         .route("/api/version", get(|| async {
             axum::Json(serde_json::json!({ "version": env!("CARGO_PKG_VERSION") }))
         }))
-        .route("/openapi.json", get(handlers::openapi_schema));
+        .route("/openapi.json", get(handlers::openapi_schema))
+        .route("/config.json", get(frontend_config));
 
     // Create trace layer for request/response logging
     let trace_layer = TraceLayer::new_for_http()
@@ -142,6 +143,16 @@ pub fn create_router(pool: DbPool, config: Config) -> Router {
         .layer(trace_layer)
         .layer(cors)
         .with_state(state)
+}
+
+/// Returns frontend configuration as JSON, generated dynamically from backend config
+async fn frontend_config(
+    axum::extract::State(state): axum::extract::State<AppState>,
+) -> impl IntoResponse {
+    let config = serde_json::json!({
+        "apiBaseURL": state.config.base_url()
+    });
+    axum::Json(config)
 }
 
 /// Fallback handler that serves static files or index.html for SPA routing
