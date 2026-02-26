@@ -12,6 +12,7 @@ use crate::{
         CompleteReading, CreateReading, Reading, ReadingQuery, ReadingStats,
         ReadingWithBook, UpdateReading, YearStats,
     },
+    models::sort::resolve_order_by,
 };
 
 pub async fn list_readings(
@@ -54,10 +55,24 @@ pub async fn list_readings(
         param_count += 1;
     }
 
+    let readings_whitelist: &[(&str, &str)] = &[
+        ("start_date", "r.start_date"),
+        ("end_date", "r.end_date"),
+        ("book_title", "b.title"),
+        ("book_author", "b.author"),
+        ("rating", "r.rating"),
+    ];
+    let (sort_col, sort_dir) = resolve_order_by(
+        query.sort_by.as_deref(),
+        query.sort_order.as_ref(),
+        readings_whitelist,
+        "r.start_date",
+        "DESC",
+    );
+
     sql.push_str(&format!(
-        " ORDER BY r.start_date DESC LIMIT ${} OFFSET ${}",
-        param_count,
-        param_count + 1
+        " ORDER BY {} {} LIMIT ${} OFFSET ${}",
+        sort_col, sort_dir, param_count, param_count + 1
     ));
 
     let mut query_builder = sqlx::query_as::<_, ReadingWithBook>(&sql).bind(claims.sub);

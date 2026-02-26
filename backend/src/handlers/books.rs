@@ -10,6 +10,7 @@ use crate::{
     middleware::Claims,
     models::book::{Book, BookQuery, AdvancedBookSearchQuery, CreateBook, UpdateBook},
     models::reading::Reading,
+    models::sort::resolve_order_by,
 };
 
 pub async fn list_books(
@@ -43,7 +44,23 @@ pub async fn list_books(
         param_count += 1;
     }
 
-    sql.push_str(&format!(" ORDER BY title LIMIT ${} OFFSET ${}", param_count, param_count + 1));
+    let books_whitelist: &[(&str, &str)] = &[
+        ("title", "title"),
+        ("author", "author"),
+        ("publication_year", "publication_year"),
+        ("pages", "pages"),
+        ("publisher", "publisher"),
+        ("language", "language"),
+    ];
+    let (sort_col, sort_dir) = resolve_order_by(
+        query.sort_by.as_deref(),
+        query.sort_order.as_ref(),
+        books_whitelist,
+        "title",
+        "ASC",
+    );
+
+    sql.push_str(&format!(" ORDER BY {} {} LIMIT ${} OFFSET ${}", sort_col, sort_dir, param_count, param_count + 1));
 
     let mut query_builder = sqlx::query_as::<_, Book>(&sql).bind(claims.sub);
 
@@ -335,7 +352,23 @@ pub async fn list_unread_books(
         param_count += 1;
     }
 
-    sql.push_str(&format!(" ORDER BY b.title LIMIT ${} OFFSET ${}", param_count, param_count + 1));
+    let unread_whitelist: &[(&str, &str)] = &[
+        ("title", "b.title"),
+        ("author", "b.author"),
+        ("publication_year", "b.publication_year"),
+        ("pages", "b.pages"),
+        ("publisher", "b.publisher"),
+        ("language", "b.language"),
+    ];
+    let (sort_col, sort_dir) = resolve_order_by(
+        query.sort_by.as_deref(),
+        query.sort_order.as_ref(),
+        unread_whitelist,
+        "b.title",
+        "ASC",
+    );
+
+    sql.push_str(&format!(" ORDER BY {} {} LIMIT ${} OFFSET ${}", sort_col, sort_dir, param_count, param_count + 1));
 
     let mut query_builder = sqlx::query_as::<_, Book>(&sql).bind(claims.sub);
 
@@ -416,7 +449,23 @@ pub async fn advanced_search_books(
         param_count += 1;
     }
 
-    sql.push_str(&format!(" ORDER BY title LIMIT ${} OFFSET ${}", param_count, param_count + 1));
+    let adv_whitelist: &[(&str, &str)] = &[
+        ("title", "title"),
+        ("author", "author"),
+        ("publication_year", "publication_year"),
+        ("pages", "pages"),
+        ("publisher", "publisher"),
+        ("language", "language"),
+    ];
+    let (sort_col, sort_dir) = resolve_order_by(
+        query.sort_by.as_deref(),
+        query.sort_order.as_ref(),
+        adv_whitelist,
+        "title",
+        "ASC",
+    );
+
+    sql.push_str(&format!(" ORDER BY {} {} LIMIT ${} OFFSET ${}", sort_col, sort_dir, param_count, param_count + 1));
 
     let mut query_builder = sqlx::query_as::<_, Book>(&sql).bind(claims.sub);
 

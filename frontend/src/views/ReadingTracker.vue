@@ -28,6 +28,8 @@
             :bordered="true"
             :row-props="getReadingRowProps"
             :single-line="false"
+            remote
+            @update:sorter="handleCurrentSorterChange"
           />
         </n-spin>
 
@@ -67,6 +69,8 @@
             :bordered="true"
             :row-props="getReadingRowProps"
             :single-line="false"
+            remote
+            @update:sorter="handleCompletedSorterChange"
           />
         </n-spin>
 
@@ -199,6 +203,12 @@ const currentTotalItems = ref(0)
 const completedTotalItems = ref(0)
 const unreadTotalItems = computed(() => booksStore.totalUnreadBooks)
 
+// Sorting state
+const currentSortBy = ref('start_date')
+const currentSortOrder = ref('descend')
+const completedSortBy = ref('end_date')
+const completedSortOrder = ref('descend')
+
 // Complete modal state
 const showCompleteModal = ref(false)
 const selectedReading = ref(null)
@@ -214,15 +224,15 @@ const formatDate = (date) => {
 
 // --- Column definitions ---
 
-const currentColumns = [
-  { title: 'Title', key: 'book_title', resizable: true, minWidth: 150 },
-  { title: 'Author', key: 'book_author', resizable: true, minWidth: 120 },
+const currentColumns = computed(() => [
+  { title: 'Title', key: 'book_title', resizable: true, minWidth: 150, sorter: true, sortOrder: currentSortBy.value === 'book_title' ? currentSortOrder.value : false },
+  { title: 'Author', key: 'book_author', resizable: true, minWidth: 120, sorter: true, sortOrder: currentSortBy.value === 'book_author' ? currentSortOrder.value : false },
   {
     title: 'Start Date',
     key: 'start_date',
     width: 140,
-    defaultSortOrder: 'descend',
-    sorter: (a, b) => new Date(a.start_date) - new Date(b.start_date),
+    sorter: true,
+    sortOrder: currentSortBy.value === 'start_date' ? currentSortOrder.value : false,
     render: (row) => formatDate(row.start_date)
   },
   {
@@ -254,29 +264,33 @@ const currentColumns = [
       })
     }
   }
-]
+])
 
-const completedColumns = [
-  { title: 'Title', key: 'book_title', resizable: true, minWidth: 150 },
-  { title: 'Author', key: 'book_author', resizable: true, minWidth: 120 },
+const completedColumns = computed(() => [
+  { title: 'Title', key: 'book_title', resizable: true, minWidth: 150, sorter: true, sortOrder: completedSortBy.value === 'book_title' ? completedSortOrder.value : false },
+  { title: 'Author', key: 'book_author', resizable: true, minWidth: 120, sorter: true, sortOrder: completedSortBy.value === 'book_author' ? completedSortOrder.value : false },
   {
     title: 'Start Date',
     key: 'start_date',
     width: 140,
+    sorter: true,
+    sortOrder: completedSortBy.value === 'start_date' ? completedSortOrder.value : false,
     render: (row) => formatDate(row.start_date)
   },
   {
     title: 'End Date',
     key: 'end_date',
     width: 140,
-    defaultSortOrder: 'descend',
-    sorter: (a, b) => new Date(a.end_date) - new Date(b.end_date),
+    sorter: true,
+    sortOrder: completedSortBy.value === 'end_date' ? completedSortOrder.value : false,
     render: (row) => formatDate(row.end_date)
   },
   {
     title: 'Rating',
     key: 'rating',
     width: 140,
+    sorter: true,
+    sortOrder: completedSortBy.value === 'rating' ? completedSortOrder.value : false,
     render: (row) => {
       if (!row.rating) return ''
       return h(NRate, { value: row.rating, readonly: true, size: 'small' })
@@ -302,7 +316,7 @@ const completedColumns = [
       }, { default: () => 'Delete' })
     }
   }
-]
+])
 
 const unreadColumns = [
   { title: 'Title', key: 'title', resizable: true, minWidth: 150 },
@@ -325,9 +339,18 @@ const getUnreadRowProps = (row) => ({
 
 // --- Data fetching ---
 
+const sortOrderToBackend = (order) => {
+  if (order === 'ascend') return 'asc'
+  if (order === 'descend') return 'desc'
+  return undefined
+}
+
 const fetchCurrentReadings = async () => {
   const params = { status: 'current' }
   if (currentYearFilter.value) params.year = currentYearFilter.value
+  if (currentSortBy.value) params.sort_by = currentSortBy.value
+  const dir = sortOrderToBackend(currentSortOrder.value)
+  if (dir) params.sort_order = dir
   const data = await readingsStore.fetchReadings(params)
   currentReadings.value = data
   if (data.length < readingsStore.pageSize) {
@@ -340,6 +363,9 @@ const fetchCurrentReadings = async () => {
 const fetchCompletedReadings = async () => {
   const params = { status: 'completed' }
   if (completedYearFilter.value) params.year = completedYearFilter.value
+  if (completedSortBy.value) params.sort_by = completedSortBy.value
+  const dir = sortOrderToBackend(completedSortOrder.value)
+  if (dir) params.sort_order = dir
   const data = await readingsStore.fetchReadings(params)
   completedReadings.value = data
   if (data.length < readingsStore.pageSize) {
@@ -444,6 +470,40 @@ const handleUnreadPageSizeChange = async (size) => {
     await booksStore.fetchUnreadBooks()
   } catch (error) {
     message.error('Failed to change page size')
+  }
+}
+
+// --- Sorter changes ---
+
+const handleCurrentSorterChange = async (sorter) => {
+  if (sorter) {
+    currentSortBy.value = sorter.columnKey
+    currentSortOrder.value = sorter.order || 'descend'
+  } else {
+    currentSortBy.value = 'start_date'
+    currentSortOrder.value = 'descend'
+  }
+  try {
+    readingsStore.setCurrentPage(1)
+    await fetchCurrentReadings()
+  } catch (error) {
+    message.error('Failed to sort readings')
+  }
+}
+
+const handleCompletedSorterChange = async (sorter) => {
+  if (sorter) {
+    completedSortBy.value = sorter.columnKey
+    completedSortOrder.value = sorter.order || 'descend'
+  } else {
+    completedSortBy.value = 'end_date'
+    completedSortOrder.value = 'descend'
+  }
+  try {
+    readingsStore.setCurrentPage(1)
+    await fetchCompletedReadings()
+  } catch (error) {
+    message.error('Failed to sort readings')
   }
 }
 

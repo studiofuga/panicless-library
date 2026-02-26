@@ -4,6 +4,7 @@ pub mod reading;
 pub mod import;
 pub mod connector;
 pub mod bookshelf;
+pub mod sort;
 
 pub use user::User;
 pub use book::Book;

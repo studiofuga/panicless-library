@@ -3,6 +3,8 @@ use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use validator::Validate;
 
+use super::sort::SortOrder;
+
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct Reading {
     pub id: i32,
@@ -57,6 +59,8 @@ pub struct ReadingQuery {
     pub year: Option<i32>,
     pub page: Option<i64>,
     pub limit: Option<i64>,
+    pub sort_by: Option<String>,
+    pub sort_order: Option<SortOrder>,
 }
 
 impl Default for ReadingQuery {
@@ -67,6 +71,8 @@ impl Default for ReadingQuery {
             year: None,
             page: Some(1),
             limit: Some(20),
+            sort_by: None,
+            sort_order: None,
         }
     }
 }

@@ -3,6 +3,8 @@ use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use validator::Validate;
 
+use super::sort::SortOrder;
+
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct Book {
     pub id: i32,
@@ -92,6 +94,8 @@ pub struct BookQuery {
     pub year: Option<i32>,
     pub page: Option<i64>,
     pub limit: Option<i64>,
+    pub sort_by: Option<String>,
+    pub sort_order: Option<SortOrder>,
 }
 
 impl Default for BookQuery {
@@ -102,6 +106,8 @@ impl Default for BookQuery {
             year: None,
             page: Some(1),
             limit: Some(20),
+            sort_by: None,
+            sort_order: None,
         }
     }
 }
@@ -118,6 +124,8 @@ pub struct AdvancedBookSearchQuery {
     pub description: Option<String>,
     pub page: Option<i64>,
     pub limit: Option<i64>,
+    pub sort_by: Option<String>,
+    pub sort_order: Option<SortOrder>,
 }
 
 impl Default for AdvancedBookSearchQuery {
@@ -133,6 +141,8 @@ impl Default for AdvancedBookSearchQuery {
             description: None,
             page: Some(1),
             limit: Some(20),
+            sort_by: None,
+            sort_order: None,
         }
     }
 }

@@ -64,6 +64,8 @@
         :bordered="true"
         :row-props="getRowProps"
         :single-line="false"
+        remote
+        @update:sorter="handleSorterChange"
       />
     </n-spin>
 
@@ -202,7 +204,13 @@ let debounceTimer = null
 
 const visibleColumns = ref(['title', 'author', 'publication_year', 'pages'])
 
-const allColumns = [
+// Sorting state
+const bookSortBy = ref('title')
+const bookSortOrder = ref('ascend')
+
+const sortableKeys = ['title', 'author', 'publication_year', 'pages', 'publisher', 'language']
+
+const allColumns = computed(() => [
   { title: 'Title', key: 'title', resizable: true, minWidth: 150 },
   { title: 'Author', key: 'author', resizable: true, minWidth: 120 },
   { title: 'Year', key: 'publication_year', width: 80 },
@@ -210,10 +218,19 @@ const allColumns = [
   { title: 'Publisher', key: 'publisher', resizable: true, minWidth: 120 },
   { title: 'ISBN', key: 'isbn', width: 150 },
   { title: 'Language', key: 'language', width: 100 }
-]
+].map(col => {
+  if (sortableKeys.includes(col.key)) {
+    return {
+      ...col,
+      sorter: true,
+      sortOrder: bookSortBy.value === col.key ? bookSortOrder.value : false
+    }
+  }
+  return col
+}))
 
 const tableColumns = computed(() => {
-  return allColumns.filter(col => visibleColumns.value.includes(col.key))
+  return allColumns.value.filter(col => visibleColumns.value.includes(col.key))
 })
 
 const getRowProps = (row) => {
@@ -240,11 +257,12 @@ const performSearch = async () => {
     if (filters.value.author) params.author = filters.value.author
     if (filters.value.publication_year) params.publication_year = filters.value.publication_year
 
+    const sortParams = buildSortParams()
     const hasFilters = Object.keys(params).length > 0
     if (hasFilters) {
-      await booksStore.advancedSearch(params)
+      await booksStore.advancedSearch({ ...params, ...sortParams })
     } else {
-      await booksStore.fetchBooks()
+      await booksStore.fetchBooks(sortParams)
     }
   } catch (error) {
     message.error('Search failed')
@@ -254,12 +272,12 @@ const performSearch = async () => {
 const clearFilters = () => {
   filters.value = { search: '', author: '', publication_year: null }
   booksStore.setCurrentPage(1)
-  booksStore.fetchBooks()
+  booksStore.fetchBooks(buildSortParams())
 }
 
 onMounted(async () => {
   try {
-    await booksStore.fetchBooks()
+    await booksStore.fetchBooks(buildSortParams())
   } catch (error) {
     message.error('Failed to load books')
   }
@@ -268,11 +286,12 @@ onMounted(async () => {
 const handlePageChange = async (page) => {
   try {
     booksStore.setCurrentPage(page)
-    const params = buildFilterParams()
-    if (Object.keys(params).length > 0) {
-      await booksStore.advancedSearch(params)
+    const filterParams = buildFilterParams()
+    const sortParams = buildSortParams()
+    if (Object.keys(filterParams).length > 0) {
+      await booksStore.advancedSearch({ ...filterParams, ...sortParams })
     } else {
-      await booksStore.fetchBooks()
+      await booksStore.fetchBooks(sortParams)
     }
   } catch (error) {
     message.error('Failed to load page')
@@ -282,15 +301,30 @@ const handlePageChange = async (page) => {
 const handlePageSizeChange = async (pageSize) => {
   try {
     booksStore.setPageSize(pageSize)
-    const params = buildFilterParams()
-    if (Object.keys(params).length > 0) {
-      await booksStore.advancedSearch(params)
+    const filterParams = buildFilterParams()
+    const sortParams = buildSortParams()
+    if (Object.keys(filterParams).length > 0) {
+      await booksStore.advancedSearch({ ...filterParams, ...sortParams })
     } else {
-      await booksStore.fetchBooks()
+      await booksStore.fetchBooks(sortParams)
     }
   } catch (error) {
     message.error('Failed to change page size')
   }
+}
+
+const sortOrderToBackend = (order) => {
+  if (order === 'ascend') return 'asc'
+  if (order === 'descend') return 'desc'
+  return undefined
+}
+
+const buildSortParams = () => {
+  const params = {}
+  if (bookSortBy.value) params.sort_by = bookSortBy.value
+  const dir = sortOrderToBackend(bookSortOrder.value)
+  if (dir) params.sort_order = dir
+  return params
 }
 
 const buildFilterParams = () => {
@@ -299,6 +333,29 @@ const buildFilterParams = () => {
   if (filters.value.author) params.author = filters.value.author
   if (filters.value.publication_year) params.publication_year = filters.value.publication_year
   return params
+}
+
+const handleSorterChange = async (sorter) => {
+  if (sorter) {
+    bookSortBy.value = sorter.columnKey
+    bookSortOrder.value = sorter.order || 'ascend'
+  } else {
+    bookSortBy.value = 'title'
+    bookSortOrder.value = 'ascend'
+  }
+  try {
+    booksStore.setCurrentPage(1)
+    const filterParams = buildFilterParams()
+    const sortParams = buildSortParams()
+    const params = { ...filterParams, ...sortParams }
+    if (Object.keys(filterParams).length > 0) {
+      await booksStore.advancedSearch(params)
+    } else {
+      await booksStore.fetchBooks(sortParams)
+    }
+  } catch (error) {
+    message.error('Failed to sort books')
+  }
 }
 
 const handleAddBook = async () => {
@@ -331,7 +388,7 @@ const handleAddBook = async () => {
 
     filters.value = { search: '', author: '', publication_year: null }
     booksStore.setCurrentPage(1)
-    await booksStore.fetchBooks()
+    await booksStore.fetchBooks(buildSortParams())
   } catch (error) {
     message.error('Failed to add book')
   } finally {
