@@ -42,7 +42,7 @@ pub struct Reading {
     pub book_id: i32,
     pub book_title: String,
     pub book_author: Option<String>,
-    pub start_date: NaiveDate,
+    pub start_date: Option<NaiveDate>,
     pub end_date: Option<NaiveDate>,
     pub rating: Option<i32>,
     pub notes: Option<String>,
@@ -153,6 +153,8 @@ pub async fn list_readings(
     user_id: i32,
     status: Option<&str>,
     year: Option<i32>,
+    date_from: Option<NaiveDate>,
+    date_to: Option<NaiveDate>,
     limit: Option<i64>,
     offset: Option<i64>,
 ) -> Result<Vec<Reading>, sqlx::Error> {
@@ -177,6 +179,16 @@ pub async fn list_readings(
         param_count += 1;
     }
 
+    if date_from.is_some() {
+        sql.push_str(&format!(" AND r.start_date >= ${}", param_count));
+        param_count += 1;
+    }
+
+    if date_to.is_some() {
+        sql.push_str(&format!(" AND r.start_date <= ${}", param_count));
+        param_count += 1;
+    }
+
     sql.push_str(" ORDER BY r.start_date DESC");
 
     let limit_val = limit.unwrap_or(100);
@@ -187,6 +199,14 @@ pub async fn list_readings(
 
     if let Some(y) = year {
         query_builder = query_builder.bind(y);
+    }
+
+    if let Some(d) = date_from {
+        query_builder = query_builder.bind(d);
+    }
+
+    if let Some(d) = date_to {
+        query_builder = query_builder.bind(d);
     }
 
     query_builder = query_builder.bind(limit_val).bind(offset_val);

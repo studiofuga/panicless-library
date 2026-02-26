@@ -119,7 +119,7 @@ pub fn get_tool_definitions() -> Vec<ToolDefinition> {
         },
         ToolDefinition {
             name: "list_readings".to_string(),
-            description: "List reading records for a user, optionally filtered by status or year, with pagination support".to_string(),
+            description: "List reading records for a user, optionally filtered by status, year, or date range, with pagination support".to_string(),
             input_schema: json!({
                 "type": "object",
                 "properties": {
@@ -131,6 +131,14 @@ pub fn get_tool_definitions() -> Vec<ToolDefinition> {
                     "year": {
                         "type": "integer",
                         "description": "Filter by year (optional)"
+                    },
+                    "start_date": {
+                        "type": "string",
+                        "description": "Filter readings started on or after this date, in YYYY-MM-DD format (optional)"
+                    },
+                    "end_date": {
+                        "type": "string",
+                        "description": "Filter readings started on or before this date, in YYYY-MM-DD format (optional)"
                     },
                     "limit": {
                         "type": "integer",
@@ -464,12 +472,28 @@ async fn get_book_details(pool: &PgPool, args: Value, user_id: i32) -> Result<To
 }
 
 async fn list_readings(pool: &PgPool, args: Value, user_id: i32) -> Result<ToolCallResult, String> {
+    use chrono::NaiveDate;
+
     let status = args["status"].as_str();
     let year = args["year"].as_i64().map(|y| y as i32);
     let limit = args["limit"].as_i64();
     let offset = args["offset"].as_i64();
 
-    let readings = queries::list_readings(pool, user_id, status, year, limit, offset)
+    let date_from = if let Some(s) = args["start_date"].as_str() {
+        Some(NaiveDate::parse_from_str(s, "%Y-%m-%d")
+            .map_err(|_| "start_date must be in YYYY-MM-DD format".to_string())?)
+    } else {
+        None
+    };
+
+    let date_to = if let Some(s) = args["end_date"].as_str() {
+        Some(NaiveDate::parse_from_str(s, "%Y-%m-%d")
+            .map_err(|_| "end_date must be in YYYY-MM-DD format".to_string())?)
+    } else {
+        None
+    };
+
+    let readings = queries::list_readings(pool, user_id, status, year, date_from, date_to, limit, offset)
         .await
         .map_err(|e| e.to_string())?;
 
@@ -485,7 +509,7 @@ async fn list_readings(pool: &PgPool, args: Value, user_id: i32) -> Result<ToolC
                 reading.book_id,
                 reading.book_title,
                 reading.book_author.as_deref().unwrap_or("Unknown"),
-                reading.start_date,
+                reading.start_date.map(|d| d.to_string()).unwrap_or_else(|| "Unknown".to_string()),
                 reading.end_date.map(|d| d.to_string()).unwrap_or_else(|| "Still reading".to_string()),
                 reading.rating.map(|r| format!("{}/5", r)).unwrap_or_else(|| "Not rated".to_string()),
                 reading.notes.as_deref().unwrap_or("No notes")
