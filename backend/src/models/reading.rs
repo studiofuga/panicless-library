@@ -1,22 +1,12 @@
-use chrono::{DateTime, NaiveDate, Utc};
-use serde::{Deserialize, Serialize};
-use sqlx::FromRow;
+use chrono::NaiveDate;
+use serde::Deserialize;
 use validator::Validate;
 
 use super::sort::SortOrder;
 
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct Reading {
-    pub id: i32,
-    pub user_id: i32,
-    pub book_id: i32,
-    pub start_date: Option<NaiveDate>,
-    pub end_date: Option<NaiveDate>,
-    pub rating: Option<i32>,
-    pub notes: Option<String>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-}
+pub use panicless_mcp_lib::models::{
+    Reading, ReadingStats, ReadingWithBook, YearStats,
+};
 
 #[derive(Debug, Deserialize, Validate)]
 pub struct CreateReading {
@@ -75,35 +65,4 @@ impl Default for ReadingQuery {
             sort_order: None,
         }
     }
-}
-
-#[derive(Debug, Serialize, Deserialize, FromRow)]
-pub struct ReadingWithBook {
-    pub id: i32,
-    pub user_id: i32,
-    pub book_id: i32,
-    pub start_date: Option<NaiveDate>,
-    pub end_date: Option<NaiveDate>,
-    pub rating: Option<i32>,
-    pub notes: Option<String>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-    pub book_title: String,
-    pub book_author: Option<String>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct ReadingStats {
-    pub total_readings: i64,
-    pub completed_readings: i64,
-    pub current_readings: i64,
-    pub total_books_read: i64,
-    pub average_rating: Option<f64>,
-    pub books_by_year: Vec<YearStats>,
-}
-
-#[derive(Debug, Serialize, Deserialize, FromRow)]
-pub struct YearStats {
-    pub year: i32,
-    pub count: i64,
 }
