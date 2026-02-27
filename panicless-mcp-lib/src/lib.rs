@@ -1,3 +1,4 @@
+pub mod models;
 pub mod protocol;
 pub mod queries;
 pub mod tools;

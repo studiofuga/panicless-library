@@ -1,61 +1,7 @@
-use chrono::{DateTime, NaiveDate, Utc};
-use sqlx::{FromRow, PgPool};
+use chrono::NaiveDate;
+use sqlx::PgPool;
 
-#[derive(Debug, FromRow)]
-pub struct Book {
-    pub id: i32,
-    pub user_id: i32,
-    pub title: String,
-    pub author: Option<String>,
-    pub edition: Option<String>,
-    pub isbn: Option<String>,
-    pub publication_year: Option<i32>,
-    pub publisher: Option<String>,
-    pub pages: Option<i32>,
-    pub language: Option<String>,
-    pub description: Option<String>,
-    pub cover_image_url: Option<String>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-}
-
-#[derive(Debug, FromRow)]
-pub struct BookWithReadings {
-    pub id: i32,
-    pub title: String,
-    pub author: Option<String>,
-    pub edition: Option<String>,
-    pub isbn: Option<String>,
-    pub publication_year: Option<i32>,
-    pub publisher: Option<String>,
-    pub pages: Option<i32>,
-    pub language: Option<String>,
-    pub description: Option<String>,
-    pub reading_count: i64,
-    pub readings_summary: Option<String>,
-}
-
-#[derive(Debug, FromRow)]
-pub struct Reading {
-    pub id: i32,
-    pub user_id: i32,
-    pub book_id: i32,
-    pub book_title: String,
-    pub book_author: Option<String>,
-    pub start_date: Option<NaiveDate>,
-    pub end_date: Option<NaiveDate>,
-    pub rating: Option<i32>,
-    pub notes: Option<String>,
-}
-
-pub struct ReadingStats {
-    pub total_readings: i64,
-    pub completed_readings: i64,
-    pub current_readings: i64,
-    pub total_books_read: i64,
-    pub average_rating: Option<f64>,
-    pub books_by_year: Vec<(i32, i64)>,
-}
+use crate::models::{Book, BookWithReadings, ReadingStats, ReadingWithBook, YearStats};
 
 pub async fn search_books(
     pool: &PgPool,
@@ -157,9 +103,9 @@ pub async fn list_readings(
     date_to: Option<NaiveDate>,
     limit: Option<i64>,
     offset: Option<i64>,
-) -> Result<Vec<Reading>, sqlx::Error> {
+) -> Result<Vec<ReadingWithBook>, sqlx::Error> {
     let mut sql = String::from(
-        "SELECT r.id, r.user_id, r.book_id, r.start_date, r.end_date, r.rating, r.notes,
+        "SELECT r.id, r.user_id, r.book_id, r.start_date, r.end_date, r.rating, r.notes, r.created_at, r.updated_at,
          b.title as book_title, b.author as book_author
          FROM readings r
          JOIN books b ON r.book_id = b.id
@@ -195,7 +141,7 @@ pub async fn list_readings(
     let offset_val = offset.unwrap_or(0);
     sql.push_str(&format!(" LIMIT ${} OFFSET ${}", param_count, param_count + 1));
 
-    let mut query_builder = sqlx::query_as::<_, Reading>(&sql).bind(user_id);
+    let mut query_builder = sqlx::query_as::<_, ReadingWithBook>(&sql).bind(user_id);
 
     if let Some(y) = year {
         query_builder = query_builder.bind(y);
@@ -252,12 +198,12 @@ pub async fn get_reading_stats(
     .fetch_one(pool)
     .await?;
 
-    let books_by_year: Vec<(i32, i64)> = sqlx::query_as(
-        "SELECT EXTRACT(YEAR FROM end_date)::INTEGER, COUNT(*)::BIGINT
+    let books_by_year: Vec<YearStats> = sqlx::query_as(
+        "SELECT EXTRACT(YEAR FROM end_date)::INTEGER as year, COUNT(*)::BIGINT as count
          FROM readings
          WHERE user_id = $1 AND end_date IS NOT NULL
          GROUP BY EXTRACT(YEAR FROM end_date)
-         ORDER BY EXTRACT(YEAR FROM end_date) DESC",
+         ORDER BY year DESC",
     )
     .bind(user_id)
     .fetch_all(pool)

@@ -541,7 +541,7 @@ async fn get_reading_statistics(pool: &PgPool, _args: Value, user_id: i32) -> Re
             "No completed readings yet".to_string()
         } else {
             stats.books_by_year.iter()
-                .map(|(year, count)| format!("  {}: {} books", year, count))
+                .map(|ys| format!("  {}: {} books", ys.year, ys.count))
                 .collect::<Vec<_>>()
                 .join("\n")
         }
