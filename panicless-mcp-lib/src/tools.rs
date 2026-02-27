@@ -138,7 +138,7 @@ pub fn get_tool_definitions() -> Vec<ToolDefinition> {
                     },
                     "end_date": {
                         "type": "string",
-                        "description": "Filter readings started on or before this date, in YYYY-MM-DD format (optional)"
+                        "description": "Filter readings completed on or before this date, in YYYY-MM-DD format (optional)"
                     },
                     "limit": {
                         "type": "integer",

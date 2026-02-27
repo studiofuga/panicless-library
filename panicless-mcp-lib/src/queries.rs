@@ -185,7 +185,7 @@ pub async fn list_readings(
     }
 
     if date_to.is_some() {
-        sql.push_str(&format!(" AND r.start_date <= ${}", param_count));
+        sql.push_str(&format!(" AND r.end_date <= ${}", param_count));
         param_count += 1;
     }
 
