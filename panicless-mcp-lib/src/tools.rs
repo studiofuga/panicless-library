@@ -335,7 +335,7 @@ async fn search_books(pool: &PgPool, args: Value, user_id: i32) -> Result<ToolCa
     let limit = args["limit"].as_i64();
     let offset = args["offset"].as_i64();
 
-    let books = queries::search_books(pool, user_id, query, author, year, limit, offset)
+    let books = queries::search_books(pool, user_id, query, author, year, None, None, limit, offset)
         .await
         .map_err(|e| e.to_string())?;
 
@@ -387,6 +387,8 @@ async fn advanced_search_books(pool: &PgPool, args: Value, user_id: i32) -> Resu
         language,
         publisher,
         description,
+        None,
+        None,
         limit,
         offset,
     )
@@ -493,7 +495,7 @@ async fn list_readings(pool: &PgPool, args: Value, user_id: i32) -> Result<ToolC
         None
     };
 
-    let readings = queries::list_readings(pool, user_id, status, year, date_from, date_to, limit, offset)
+    let readings = queries::list_readings(pool, user_id, status, year, date_from, date_to, None, None, None, limit, offset)
         .await
         .map_err(|e| e.to_string())?;
 
